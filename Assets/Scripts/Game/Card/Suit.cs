@@ -1,6 +1,6 @@
 public enum Suit : byte
 {
-    Oros,
+    Oros = 1,
     Bastos,
     Espadas,
     Copas,

@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 using Random = System.Random;
 
 [Serializable]
-public class Deck : MonoBehaviour
+public class Deck
 {
     public List<Card> Cards => _cards.ToList();
     private Queue<Card> _cards;
@@ -15,19 +14,7 @@ public class Deck : MonoBehaviour
         CreateDeck();
         ShuffleDeck();
     }
-
-    private void Start()
-    {
-        CreateDeck();
-        ShuffleDeck();
-        LoadCardSprites();
-        
-        Debug.Log(_cards.Count);
-        Debug.Log(_cards.First().Suit);
-        Debug.Log(_cards.First().Value);
-        Debug.Log($"{(int)_cards.First().Suit}_{(int)_cards.First().Value}_{_cards.First().CardSprite.name}");
-    }
-
+    
     public Deck(IEnumerable<int> cards)
     {
         _cards = new Queue<Card>();
@@ -83,13 +70,5 @@ public class Deck : MonoBehaviour
         }
 
         _cards = new Queue<Card>(shuffledArray);
-    }
-
-    private void LoadCardSprites()
-    {
-        foreach (Card card in _cards)
-        {
-            card.LoadSprite();
-        }
     }
 }
