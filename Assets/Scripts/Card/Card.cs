@@ -18,11 +18,18 @@ public class Card : INetworkSerializable
         _suit = suit;
         _value = value;
     }
+    
+    public bool IsFaceUp { get; private set; } = true;
+
+    public void SetFaceDown()
+    {
+        IsFaceUp = false;
+    }
 
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
         serializer.SerializeValue(ref _suit);
         serializer.SerializeValue(ref _value);
     }
-    
+   
 }
