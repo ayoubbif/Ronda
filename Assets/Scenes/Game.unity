@@ -595,9 +595,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 96fb422312732db42967b1f34c85f990, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  players: []
-  cardPrefab: {fileID: 7588239630652998023, guid: 0ea604cdbe9466949846caad89a3c9a2, type: 3}
+  cardPrefab: {fileID: 1000016203661699412, guid: 0ea604cdbe9466949846caad89a3c9a2, type: 3}
   hand: {fileID: 1727611296122602385}
+  players: []
+  _table: {fileID: 1131273580}
 --- !u!4 &1525513369
 Transform:
   m_ObjectHideFlags: 0

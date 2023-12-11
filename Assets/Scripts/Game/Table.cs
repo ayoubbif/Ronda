@@ -12,4 +12,14 @@ public class Table : MonoBehaviour
     {
         _cards = cards;
     }
+    
+    public void AddCardToTable(Card card)
+    {
+        _cards.Add(card);
+    }
+    
+    public bool HasCardBeenPlayed(Card card)
+    {
+        return _cards.Contains(card);
+    }
 }

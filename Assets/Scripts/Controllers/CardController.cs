@@ -1,4 +1,4 @@
-﻿using Unity.Netcode;
+﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -8,6 +8,12 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     private Image _cardImage;
     private Transform _parent;
     private Table _table;
+    private Card _card;
+
+    [SerializeField] private Value _value;
+    [SerializeField] private Suit _suit;
+    
+    private static Game Game => Game.Instance;
 
     private void Awake()
     {
@@ -82,6 +88,28 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     private void PlayCardOnTable(Transform table)
     {
         SetCardParentAndPosition(table);
+        
+        _value = GetCardValue().Value;
+        _suit = GetCardValue().Suit;
+                
+        Game.NotifyServerOnCardPlayedServerRpc(CardConverter.GetCodedCard(_card));
+        
+        GetComponentInParent<Table>().AddCardToTable(_card);
+    }
+    
+    private Card GetCardValue()
+    {
+        // Extracting card suit and value from the GameObject's name
+        string[] nameParts = gameObject.name.Split('_');
+        if (nameParts.Length == 2)
+        {
+            if (int.TryParse(nameParts[0], out int suitValue) && int.TryParse(nameParts[1], out int valueValue))
+            {
+                _card = new Card((Suit)suitValue, (Value)valueValue);
+            }
+        }
+        
+        return _card;
     }
 
     private void ReturnCardToHand()

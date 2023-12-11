@@ -10,21 +10,23 @@ using UnityEngine.UI;
 public class Game : NetworkBehaviour
 {
     public static Game Instance { get; private set; }
-    public Action<ulong> OnCardsDealt;
-    private Deck _deck;
-    private bool _isDeckInitialized;
-    
-    public List<Player> Players => players.ToList();
-    [SerializeField] private List<Player> players = new();
     
     [SerializeField] private GameObject cardPrefab;
     [SerializeField] private Transform hand;
     
+    public List<Player> Players => players.ToList();
+    [SerializeField] private List<Player> players = new();
+    
     private Image _cardImage;
     private int _numCardsToDeal;
+    private Action<ulong> OnCardsDealt;
     
-    [SerializeField] private Table table;
-    public List<Card> CardsOnTable => table.Cards.ToList();
+    private Deck _deck;
+    private bool _isDeckInitialized;
+
+    [SerializeField] private Table _table;
+    
+    
     public Player LocalPlayer => GetLocalPlayer();
 
     private void OnEnable()
@@ -126,7 +128,6 @@ public class Game : NetworkBehaviour
     [ClientRpc]
     private void SetPlayersCardsClientRpc(ulong playerId, Card[] cards)
     {
-        Debug.Log($"ClientRpc called. PlayerId: {playerId}, Cards: {cards.Length}");
         SetPlayersCards(playerId, cards);
     }
 
@@ -147,8 +148,12 @@ public class Game : NetworkBehaviour
             {
                 var cardInstance = Instantiate(cardPrefab, hand);
                 var cardImage = cardInstance.GetComponent<Image>();
+                
+                Suit cardSuit = LocalPlayer.Cards[i].Suit;
+                Value cardValue = LocalPlayer.Cards[i].Value;
 
-                string path = $"Sprites/Cards/{(int)LocalPlayer.Cards[i].Suit}_{(int)LocalPlayer.Cards[i].Value}";
+
+                string path = $"Sprites/Cards/{(int)cardSuit}_{(int)cardValue}";
                 Sprite sprite = Resources.Load<Sprite>(path);
 
                 if (sprite == null)
@@ -157,12 +162,53 @@ public class Game : NetworkBehaviour
                 }
                 else
                 {
-                    // Assuming each card has its own Image component
                     cardImage.sprite = sprite;
+                    cardInstance.name = $"{(int)cardSuit}_{(int)cardValue}";
                 }
             }
         }
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyServerOnCardPlayedServerRpc(int codedCard)
+    {
+        Debug.Log($"Server received NotifyServerOnCardPlayedServerRpc. Coded Card: {codedCard}");
+    
+        // Notify the other player about the played card
+        NotifyServerOnCardPlayedClientRpc(codedCard);
+    }
+
+    [ClientRpc]
+    private void NotifyServerOnCardPlayedClientRpc(int codedCard)
+    {
+        // Check if the player invoking the method is the local player
+        if (IsOwner && IsLocalPlayer) return;
+        {
+            // Spawn the played card on the table for other players
+            GameObject playedCardObject = Instantiate(cardPrefab, _table.transform);
+            Image playedCardImage = playedCardObject.GetComponent<Image>();
+
+            // Decode the coded card to get the suit and value (assuming you have a CardConverter class)
+            Card playedCard = CardConverter.DecodeCodedCard(codedCard);
+
+            // Load the sprite for the played card
+            string path = $"Sprites/Cards/{(int)playedCard.Suit}_{(int)playedCard.Value}";
+            Sprite sprite = Resources.Load<Sprite>(path);
+
+            if (sprite == null)
+            {
+                Debug.LogError($"Sprite not found at path: {path}");
+            }
+            else
+            {
+                playedCardImage.sprite = sprite;
+                playedCardObject.name = $"{(int)playedCard.Suit}_{(int)playedCard.Value}";
+            }
+
+            _table.AddCardToTable(playedCard);
+        }
+    }
+
 
     #endregion
     
@@ -176,9 +222,7 @@ public class Game : NetworkBehaviour
     
     private void DealFromDeck()
     {
-        Debug.Log($"Server: _deck.Cards.Count is {_deck.Cards.Count}");
         _numCardsToDeal = _deck.Cards.Count == 4 ? 2 : 3;
-        Debug.Log($"Server: numCardsToDeal is {_numCardsToDeal}");
 
         foreach (var player in players)
         {
@@ -192,8 +236,6 @@ public class Game : NetworkBehaviour
 
             // Inform the clients about the dealt cards
             SetPlayersCardsClientRpc(player.OwnerClientId, player.Cards);
-            
-            Debug.Log($"Server: Player ('{player.OwnerClientId}') received: {player.Cards.Length}.");
         }
     }
     

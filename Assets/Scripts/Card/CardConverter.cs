@@ -18,4 +18,19 @@ public static class CardConverter
 
         return codedCards.ToArray();
     }
+    
+    public static int GetCodedCard(Card card)
+    {
+        var suit = (int)card.Suit;
+        var value = (int)card.Value;
+        return suit * 100 + value;
+    }
+
+    public static Card DecodeCodedCard(int codedCard)
+    {
+        Suit suit = (Suit)(codedCard / 100);
+        Value value = (Value)(codedCard % 100);
+        return new Card(suit, value);
+    }
+
 }
