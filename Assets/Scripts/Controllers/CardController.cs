@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
@@ -82,8 +81,6 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     private void PlayCardOnTable(Transform table)
     {
         SetCardParentAndPosition(table);
-        
-        gameObject.SetActive(false);
     }
 
     private void ReturnCardToHand()

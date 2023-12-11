@@ -6,7 +6,7 @@ using UnityEngine;
 public class Table : MonoBehaviour
 {
     public List<Card> Cards => _cards.ToList();
-    [SerializeField] private List<Card> _cards;
+    [SerializeField] private List<Card> _cards = new();
 
     public Table(List<Card> cards)
     {

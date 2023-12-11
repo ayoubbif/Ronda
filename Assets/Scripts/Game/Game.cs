@@ -42,9 +42,7 @@ public class Game : NetworkBehaviour
     public void AddPlayer(Player newPlayer)
     {
         players.Add(newPlayer);
-        Debug.Log($"Player added to _players list. Player count: {players.Count}");
     }
-
     
     private Player GetLocalPlayer()
     {
@@ -57,8 +55,6 @@ public class Game : NetworkBehaviour
 
         return localPlayer;
     }
-
-
     
     private IEnumerator DealAfterDelay(float delay)
     {
@@ -66,7 +62,6 @@ public class Game : NetworkBehaviour
 
         S_Deal();
     }
-
     
     #region Server
     private void S_Deal()
@@ -112,7 +107,6 @@ public class Game : NetworkBehaviour
         SetPlayersCards(playerId, cards);
     }
     #endregion
-
     
     private void InitDeck(int[] deck)
     {
@@ -130,15 +124,12 @@ public class Game : NetworkBehaviour
 
         foreach (var player in players)
         {
-            Debug.Log($"Server: Dealing {numCardsToDeal} cards to player {player.OwnerClientId}");
-            
             // Ensure that the player.Cards array is initialized with the correct size
             player.InitializeCards(numCardsToDeal);
 
             for (int i = 0; i < numCardsToDeal; i++)
             {
                 player.Cards[i] = _deck.PullCard();
-                Debug.Log($"Server: Pulling card {i + 1} for player {player.OwnerClientId}");
             }
 
             // Inform the clients about the dealt cards
@@ -147,7 +138,6 @@ public class Game : NetworkBehaviour
             Debug.Log($"Server: Player ('{player.OwnerClientId}') received: {player.Cards.Length}.");
         }
     }
-
     
     private void SetPlayersCards(ulong playerId, Card[] cards)
     {

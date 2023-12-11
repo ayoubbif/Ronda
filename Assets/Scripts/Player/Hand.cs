@@ -1,4 +1,3 @@
-using System;
 using Unity.Netcode;
 using UnityEngine.UI;
 using UnityEngine;
@@ -13,16 +12,16 @@ public class Hand : NetworkBehaviour
     private void OnEnable()
     {
         // Subscribe to the OnCardsDealt event
-        Game.Instance.OnCardsDealt += UpdateCardsUIClientRpc;
+        Game.OnCardsDealt += UpdateCardsUIClientRpc;
     }
 
     private void OnDisable()
     {
         // Unsubscribe from the event to avoid memory leaks
-        Game.Instance.OnCardsDealt -= UpdateCardsUIClientRpc;
+        Game.OnCardsDealt -= UpdateCardsUIClientRpc;
     }
     
-
+    
     [ClientRpc]
     private void SpawnCardSlotsClientRpc(int amount)
     {
@@ -36,12 +35,10 @@ public class Hand : NetworkBehaviour
             return;
         }
 
-        Debug.Log($"Instantiated Card Amount: {amount}");
-
         // Instantiate cardPrefab GameObjects
         for (int i = 0; i < amount; i++)
         {
-            GameObject cardInstance = Instantiate(cardPrefab, transform); // Assuming the Hand script is attached to the same GameObject
+            GameObject cardInstance = Instantiate(cardPrefab, transform);
             Image cardImage = cardInstance.GetComponent<Image>();
 
             // Ensure that the cardPrefab has an Image component
@@ -55,24 +52,12 @@ public class Hand : NetworkBehaviour
             cardImages[i] = cardImage;
         }
     }
-
-    // Helper method to clear existing card slots
-    private void ClearCardSlots()
-    {
-        foreach (Image cardImage in cardImages)
-        {
-            if (cardImage != null)
-            {
-                Destroy(cardImage.gameObject);
-            }
-        }
-    }
     
     [ClientRpc]
     private void UpdateCardsUIClientRpc(ulong playerId)
     {
         // Update the reference to the local player
-        player = Game.Instance.LocalPlayer;
+        player = Game.LocalPlayer;
         
         if (player == null)
         {
@@ -108,6 +93,16 @@ public class Hand : NetworkBehaviour
             }
         }
     }
-
-
+    
+    // Helper method to clear existing card slots
+    private void ClearCardSlots()
+    {
+        foreach (Image cardImage in cardImages)
+        {
+            if (cardImage != null)
+            {
+                Destroy(cardImage.gameObject);
+            }
+        }
+    }
 }
