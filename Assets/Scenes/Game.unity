@@ -595,7 +595,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 96fb422312732db42967b1f34c85f990, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _players: []
+  players: []
+  cardPrefab: {fileID: 7588239630652998023, guid: 0ea604cdbe9466949846caad89a3c9a2, type: 3}
+  hand: {fileID: 1727611296122602385}
 --- !u!4 &1525513369
 Transform:
   m_ObjectHideFlags: 0
@@ -896,8 +898,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1727611296122602385}
   - component: {fileID: 7688291097333860375}
-  - component: {fileID: 7688291097333860376}
-  - component: {fileID: 6662936499864029921}
   - component: {fileID: 6329543986973611745}
   - component: {fileID: 2973806752483538163}
   m_Layer: 5
@@ -931,24 +931,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4364736095402466058}
   m_CullTransparentMesh: 1
---- !u!114 &6662936499864029921
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4364736095402466058}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0316c13c16cdede40a26a4db0dd6fa89, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  cardImages:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  _player: {fileID: 0}
-  cardPrefab: {fileID: 7588239630652998023, guid: 0ea604cdbe9466949846caad89a3c9a2, type: 3}
 --- !u!114 &7688291097333860375
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -975,26 +957,6 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
---- !u!114 &7688291097333860376
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4364736095402466058}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3180168944
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

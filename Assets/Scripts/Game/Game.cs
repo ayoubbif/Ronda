@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.UI;
 
 
 public class Game : NetworkBehaviour
@@ -11,13 +12,30 @@ public class Game : NetworkBehaviour
     public static Game Instance { get; private set; }
     public Action<ulong> OnCardsDealt;
     private Deck _deck;
+    private bool _isDeckInitialized;
     
     public List<Player> Players => players.ToList();
     [SerializeField] private List<Player> players = new();
     
-    private bool _isDeckInitialized;
+    [SerializeField] private GameObject cardPrefab;
+    [SerializeField] private Transform hand;
     
+    private Image _cardImage;
+    private int _numCardsToDeal;
+    
+    [SerializeField] private Table table;
+    public List<Card> CardsOnTable => table.Cards.ToList();
     public Player LocalPlayer => GetLocalPlayer();
+
+    private void OnEnable()
+    {
+        OnCardsDealt += SpawnCardsClientRpc;
+    }
+    
+    private void OnDisable()
+    {
+        OnCardsDealt -= SpawnCardsClientRpc;
+    }
 
     private void Awake()
     {
@@ -29,6 +47,11 @@ public class Game : NetworkBehaviour
         {
             Destroy(gameObject);
         }
+    }
+    
+    private void Start()
+    {
+        _cardImage = cardPrefab.GetComponent<Image>();
     }
 
     private void Update()
@@ -106,6 +129,41 @@ public class Game : NetworkBehaviour
         Debug.Log($"ClientRpc called. PlayerId: {playerId}, Cards: {cards.Length}");
         SetPlayersCards(playerId, cards);
     }
+
+    [ClientRpc]
+    private void SpawnCardsClientRpc(ulong playerId)
+    {
+        // Check if the current instance is the local player's client
+        if (IsClient && LocalPlayer.OwnerClientId == playerId)
+        {
+            if (LocalPlayer.Cards == null)
+            {
+                LocalPlayer.InitializeCards(_numCardsToDeal);
+                return;
+            }
+        
+            // Update the card images based on the player's hand
+            for (int i = 0; i < LocalPlayer.Cards.Length; i++)
+            {
+                var cardInstance = Instantiate(cardPrefab, hand);
+                var cardImage = cardInstance.GetComponent<Image>();
+
+                string path = $"Sprites/Cards/{(int)LocalPlayer.Cards[i].Suit}_{(int)LocalPlayer.Cards[i].Value}";
+                Sprite sprite = Resources.Load<Sprite>(path);
+
+                if (sprite == null)
+                {
+                    Debug.LogError($"Sprite not found at path: {path}");
+                }
+                else
+                {
+                    // Assuming each card has its own Image component
+                    cardImage.sprite = sprite;
+                }
+            }
+        }
+    }
+
     #endregion
     
     private void InitDeck(int[] deck)
@@ -119,15 +177,15 @@ public class Game : NetworkBehaviour
     private void DealFromDeck()
     {
         Debug.Log($"Server: _deck.Cards.Count is {_deck.Cards.Count}");
-        var numCardsToDeal = _deck.Cards.Count == 4 ? 2 : 3;
-        Debug.Log($"Server: numCardsToDeal is {numCardsToDeal}");
+        _numCardsToDeal = _deck.Cards.Count == 4 ? 2 : 3;
+        Debug.Log($"Server: numCardsToDeal is {_numCardsToDeal}");
 
         foreach (var player in players)
         {
             // Ensure that the player.Cards array is initialized with the correct size
-            player.InitializeCards(numCardsToDeal);
+            player.InitializeCards(_numCardsToDeal);
 
-            for (int i = 0; i < numCardsToDeal; i++)
+            for (int i = 0; i < _numCardsToDeal; i++)
             {
                 player.Cards[i] = _deck.PullCard();
             }
