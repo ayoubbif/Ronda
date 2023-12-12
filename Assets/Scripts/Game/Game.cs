@@ -135,7 +135,7 @@ public class Game : NetworkBehaviour
     private void SpawnCardsClientRpc(ulong playerId)
     {
         // Check if the current instance is the local player's client
-        if (IsClient && LocalPlayer.OwnerClientId == playerId)
+        if (LocalPlayer.OwnerClientId == playerId)
         {
             if (LocalPlayer.Cards == null)
             {
