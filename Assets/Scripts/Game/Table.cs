@@ -1,25 +1,26 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [System.Serializable]
 public class Table : MonoBehaviour
 {
-    public List<Card> Cards => _cards.ToList();
-    [SerializeField] private List<Card> _cards = new();
+    public List<Card> Cards => cards.ToList();
+    [SerializeField] private List<Card> cards;
 
     public Table(List<Card> cards)
     {
-        _cards = cards;
+        this.cards = cards;
     }
     
     public void AddCardToTable(Card card)
     {
-        _cards.Add(card);
+        cards.Add(card);
     }
     
     public bool HasCardBeenPlayed(Card card)
     {
-        return _cards.Contains(card);
+        return cards.Contains(card);
     }
 }

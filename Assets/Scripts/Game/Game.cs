@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 
 
@@ -16,10 +17,13 @@ public class Game : NetworkBehaviour
     
     public List<Player> Players => players.ToList();
     [SerializeField] private List<Player> players = new();
+    private readonly int _maxNumPlayers = 2;
     
     private Image _cardImage;
     private int _numCardsToDeal;
-    private Action<ulong> OnCardsDealt;
+    private Action<ulong> _onCardsDealt;
+    private Action<bool> _onEmptyHands;
+    private bool _isEmptyHanded;
     
     private Deck _deck;
     private bool _isDeckInitialized;
@@ -31,12 +35,12 @@ public class Game : NetworkBehaviour
 
     private void OnEnable()
     {
-        OnCardsDealt += SpawnCardsClientRpc;
+        _onCardsDealt += SpawnCardsClientRpc;
     }
     
     private void OnDisable()
     {
-        OnCardsDealt -= SpawnCardsClientRpc;
+        _onCardsDealt -= SpawnCardsClientRpc;
     }
 
     private void Awake()
@@ -55,18 +59,31 @@ public class Game : NetworkBehaviour
     {
         _cardImage = cardPrefab.GetComponent<Image>();
     }
-
-    private void Update()
+    
+    private void CheckForEmptyHandAndDeal()
     {
-        if (Input.GetKeyDown(KeyCode.D))
+        // Check if there are exactly 2 players and both players have empty hands
+        if (Players.Count == 2 && AllPlayersEmptyHanded())
         {
             StartCoroutine(DealAfterDelay(1f));
         }
+    }
+    
+    private bool AllPlayersEmptyHanded()
+    {
+        return _numCardsToDeal switch
+        {
+            3 => _table.Cards.Count / 6 == 1,
+            2 => _table.Cards.Count / 4 == 1,
+            _ => false
+        };
     }
 
     public void AddPlayer(Player newPlayer)
     {
         players.Add(newPlayer);
+        if(Players.Count == 2)
+            StartCoroutine(DealAfterDelay(1f));
     }
     
     private Player GetLocalPlayer()
@@ -89,10 +106,12 @@ public class Game : NetworkBehaviour
     }
     
     #region Server
+    
     private void S_Deal()
     {
-        if (IsServer == false)
+        if (IsServer == false && Players.Count < _maxNumPlayers)
         {
+            Debug.Log("Not enough players");
             return;
         }
 
@@ -107,8 +126,8 @@ public class Game : NetworkBehaviour
 
         // Inform the clients to initialize the deck
         InitDeckClientRpc(codedCards);
-
-        // Deal cards on the server
+        
+        // Deal new cards
         DealFromDeck();
         
         Debug.Log($"Server: There are {_deck.Cards.Count} cards left in deck");
@@ -135,7 +154,7 @@ public class Game : NetworkBehaviour
     private void SpawnCardsClientRpc(ulong playerId)
     {
         // Check if the current instance is the local player's client
-        if (LocalPlayer.OwnerClientId == playerId)
+        if (IsClient && LocalPlayer.OwnerClientId == playerId)
         {
             if (LocalPlayer.Cards == null)
             {
@@ -173,10 +192,27 @@ public class Game : NetworkBehaviour
     public void NotifyServerOnCardPlayedServerRpc(int codedCard, ulong playerId)
     {
         Debug.Log($"Server received NotifyServerOnCardPlayedServerRpc. Coded Card: {codedCard}");
-    
+
+        // Check if LocalPlayer is null
+        if (LocalPlayer == null)
+        {
+            Debug.LogError("Local player is null");
+            return;
+        }
+
+        // Check if LocalPlayer.Cards is null
+        if (LocalPlayer.Cards == null)
+        {
+            Debug.LogError("Local player cards are null");
+            return;
+        }
+
         // Notify the other player about the played card
         NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
+        
+        CheckForEmptyHandAndDeal();
     }
+
 
     [ClientRpc]
     private void NotifyServerOnCardPlayedClientRpc(int codedCard, ulong playerId)
@@ -231,7 +267,8 @@ public class Game : NetworkBehaviour
 
             for (int i = 0; i < _numCardsToDeal; i++)
             {
-                player.Cards[i] = _deck.PullCard();
+                var newCard = _deck.PullCard();
+                player.Cards[i] = newCard;
             }
 
             // Inform the clients about the dealt cards
@@ -249,6 +286,6 @@ public class Game : NetworkBehaviour
         }
         
         player.SetCards(cards);
-        OnCardsDealt?.Invoke(player.OwnerClientId);
+        _onCardsDealt?.Invoke(player.OwnerClientId);
     }
 }

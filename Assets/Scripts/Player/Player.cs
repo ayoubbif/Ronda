@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -5,6 +7,7 @@ using UnityEngine;
 public class Player : NetworkBehaviour
 {
     public Card[] Cards { get; set; }
+    
     public string NickName => _nickName.Value.ToString();
     private readonly NetworkVariable<FixedString32Bytes> _nickName = new();
     
@@ -19,7 +22,7 @@ public class Player : NetworkBehaviour
         
         if (IsOwner)
         {
-            SetSeatServerRpc();
+            AddPlayerServerRpc();
         }
     }
     
@@ -32,19 +35,19 @@ public class Player : NetworkBehaviour
     {
         Cards = cards;
     }
-
+    
     [ClientRpc]
-    private void SetSeatClientRpc()
+    private void AddPlayerClientRpc()
     {
         Game.AddPlayer(this);
         Debug.Log($"Player count: {Game.Players.Count}");
     }
 
     [ServerRpc]
-    private void SetSeatServerRpc()
+    private void AddPlayerServerRpc()
     {
         // Call the client RPC to add the player on all clients
-        SetSeatClientRpc();
+        AddPlayerClientRpc();
     }
 
 }
