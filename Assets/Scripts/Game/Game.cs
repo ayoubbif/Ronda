@@ -170,19 +170,19 @@ public class Game : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void NotifyServerOnCardPlayedServerRpc(int codedCard)
+    public void NotifyServerOnCardPlayedServerRpc(int codedCard, ulong playerId)
     {
         Debug.Log($"Server received NotifyServerOnCardPlayedServerRpc. Coded Card: {codedCard}");
     
         // Notify the other player about the played card
-        NotifyServerOnCardPlayedClientRpc(codedCard);
+        NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
     }
 
     [ClientRpc]
-    private void NotifyServerOnCardPlayedClientRpc(int codedCard)
+    private void NotifyServerOnCardPlayedClientRpc(int codedCard, ulong playerId)
     {
         // Check if the player invoking the method is the local player
-        if (IsOwner && IsLocalPlayer) return;
+        if (LocalPlayer.OwnerClientId == playerId) return;
         {
             // Spawn the played card on the table for other players
             GameObject playedCardObject = Instantiate(cardPrefab, _table.transform);
