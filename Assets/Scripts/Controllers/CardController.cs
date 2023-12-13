@@ -1,8 +1,7 @@
-﻿using System;
-using System.Collections;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.SocialPlatforms;
 
 public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler
 {
@@ -93,9 +92,9 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
         _value = GetCardValue().Value;
         _suit = GetCardValue().Suit;
 
-        var localPlayer = Game.LocalPlayer.OwnerClientId;
+        var localPlayerId = Game.LocalPlayer.OwnerClientId;
                 
-        Game.NotifyServerOnCardPlayedServerRpc(CardConverter.GetCodedCard(_card), localPlayer);
+        Game.NotifyServerOnCardPlayedServerRpc(CardConverter.GetCodedCard(_card), localPlayerId);
         
         GetComponentInParent<Table>().AddCardToTable(_card);
     }

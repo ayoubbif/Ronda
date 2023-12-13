@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Unity.Netcode;
-using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 
 
@@ -63,25 +62,16 @@ public class Game : NetworkBehaviour
     private void CheckForEmptyHandAndDeal()
     {
         // Check if there are exactly 2 players and both players have empty hands
-        if (Players.Count == 2 && AllPlayersEmptyHanded())
-        {
-            StartCoroutine(DealAfterDelay(1f));
-        }
-    }
-    
-    private bool AllPlayersEmptyHanded()
-    {
-        return _numCardsToDeal switch
-        {
-            3 => _table.Cards.Count / 6 == 1,
-            2 => _table.Cards.Count / 4 == 1,
-            _ => false
-        };
+        if (Players.Count != 2 || !_isEmptyHanded) return;
+        
+        Debug.Log(LocalPlayer.CardsInHand.Count);
+        StartCoroutine(DealAfterDelay(1f));
     }
 
     public void AddPlayer(Player newPlayer)
     {
         players.Add(newPlayer);
+        
         if(Players.Count == 2)
             StartCoroutine(DealAfterDelay(1f));
     }
@@ -148,6 +138,16 @@ public class Game : NetworkBehaviour
     private void SetPlayersCardsClientRpc(ulong playerId, Card[] cards)
     {
         SetPlayersCards(playerId, cards);
+        if (LocalPlayer.OwnerClientId == playerId)
+        {
+            LocalPlayer.AddCardsToHand(cards.ToList());
+            foreach (var card in LocalPlayer.CardsInHand)
+            {   
+                Debug.Log($"SetPlayersCardsClientRpc: {card.Value}, {card.Suit}");
+            }
+
+            _isEmptyHanded = false;
+        }
     }
 
     [ClientRpc]
@@ -192,60 +192,74 @@ public class Game : NetworkBehaviour
     public void NotifyServerOnCardPlayedServerRpc(int codedCard, ulong playerId)
     {
         Debug.Log($"Server received NotifyServerOnCardPlayedServerRpc. Coded Card: {codedCard}");
-
-        // Check if LocalPlayer is null
-        if (LocalPlayer == null)
-        {
-            Debug.LogError("Local player is null");
-            return;
-        }
-
-        // Check if LocalPlayer.Cards is null
-        if (LocalPlayer.Cards == null)
-        {
-            Debug.LogError("Local player cards are null");
-            return;
-        }
-
-        // Notify the other player about the played card
-        NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
         
-        CheckForEmptyHandAndDeal();
+        // Decode the coded card to get the suit and value
+        Card playedCard = CardConverter.DecodeCodedCard(codedCard);
+        
+        // Find the player who played the card
+        Player playingPlayer = Players.FirstOrDefault(p => p.OwnerClientId == playerId);
+
+                    
+        Debug.Log($"{playedCard.Value}, {playedCard.Suit}");
+        
+        // Check if the player is found
+        if (playingPlayer != null)
+        {
+            // Notify the other player about the played card
+            NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
+            
+            // Check for empty hand and deal new cards
+            CheckForEmptyHandAndDeal();
+        }
+        else
+        {
+            Debug.LogError($"Player not found with ID: {playerId}");
+        }
     }
 
 
     [ClientRpc]
     private void NotifyServerOnCardPlayedClientRpc(int codedCard, ulong playerId)
     {
+        // Decode the coded card to get the suit and value
+        Card playedCard = CardConverter.DecodeCodedCard(codedCard);
+        
+        // Remove the played card from the player's hand
+        LocalPlayer.RemoveCardFromHand(playedCard.Value, playedCard.Suit);
+        
         // Check if the player invoking the method is the local player
-        if (LocalPlayer.OwnerClientId == playerId) return;
+        if (LocalPlayer.OwnerClientId == playerId)
         {
-            // Spawn the played card on the table for other players
-            GameObject playedCardObject = Instantiate(cardPrefab, _table.transform);
-            Image playedCardImage = playedCardObject.GetComponent<Image>();
-
-            // Decode the coded card to get the suit and value (assuming you have a CardConverter class)
-            Card playedCard = CardConverter.DecodeCodedCard(codedCard);
-
-            // Load the sprite for the played card
-            string path = $"Sprites/Cards/{(int)playedCard.Suit}_{(int)playedCard.Value}";
-            Sprite sprite = Resources.Load<Sprite>(path);
-
-            if (sprite == null)
+            foreach (var card in LocalPlayer.CardsInHand)
             {
-                Debug.LogError($"Sprite not found at path: {path}");
+                Debug.Log($"card: {card.Value}_{card.Suit}, owner: {LocalPlayer.OwnerClientId}");
             }
-            else
-            {
-                playedCardImage.sprite = sprite;
-                playedCardObject.name = $"{(int)playedCard.Suit}_{(int)playedCard.Value}";
-            }
-
-            _table.AddCardToTable(playedCard);
+            
+            return;
         }
+        // Spawn the played card on the table for other players
+        GameObject playedCardObject = Instantiate(cardPrefab, _table.transform);
+        Image playedCardImage = playedCardObject.GetComponent<Image>();
+
+        // Load the sprite for the played card
+        string path = $"Sprites/Cards/{(int)playedCard.Suit}_{(int)playedCard.Value}";
+        Sprite sprite = Resources.Load<Sprite>(path);
+
+        if (sprite == null)
+        {
+            Debug.LogError($"Sprite not found at path: {path}");
+        }
+        else
+        {
+            playedCardImage.sprite = sprite;
+            playedCardObject.name = $"{(int)playedCard.Suit}_{(int)playedCard.Value}";
+        }
+            
+        _table.AddCardToTable(playedCard);
+        
+        _isEmptyHanded = LocalPlayer.CardsInHand.Count == 0;
     }
-
-
+    
     #endregion
     
     private void InitDeck(int[] deck)
@@ -267,8 +281,8 @@ public class Game : NetworkBehaviour
 
             for (int i = 0; i < _numCardsToDeal; i++)
             {
-                var newCard = _deck.PullCard();
-                player.Cards[i] = newCard;
+                var card = _deck.PullCard();
+                player.Cards[i] = card;
             }
 
             // Inform the clients about the dealt cards
