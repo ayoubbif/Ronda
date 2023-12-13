@@ -11,7 +11,12 @@ public class Player : NetworkBehaviour
     public string NickName => _nickName.Value.ToString();
     private readonly NetworkVariable<FixedString32Bytes> _nickName = new();
     
-    public uint Score => _score.Value;
+    public uint Score
+    {
+        get => _score.Value;
+        set => _score.Value = value;
+    }
+
     private readonly NetworkVariable<uint> _score = new();
 
     private static Game Game => Game.Instance;

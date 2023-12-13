@@ -23,6 +23,7 @@ public class Game : NetworkBehaviour
     private Action<ulong> _onCardsDealt;
     private Action<bool> _onEmptyHands;
     private bool _isEmptyHanded;
+    private bool _areMatchingCards;
     
     private Deck _deck;
     private bool _isDeckInitialized;
@@ -198,7 +199,6 @@ public class Game : NetworkBehaviour
         
         // Find the player who played the card
         Player playingPlayer = Players.FirstOrDefault(p => p.OwnerClientId == playerId);
-
                     
         Debug.Log($"{playedCard.Value}, {playedCard.Suit}");
         
@@ -207,6 +207,10 @@ public class Game : NetworkBehaviour
         {
             // Notify the other player about the played card
             NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
+            
+            
+            if(_areMatchingCards)
+                AddScoreToLastPlayer(playingPlayer, 2);
             
             // Check for empty hand and deal new cards
             CheckForEmptyHandAndDeal();
@@ -226,6 +230,8 @@ public class Game : NetworkBehaviour
         
         // Remove the played card from the player's hand
         LocalPlayer.RemoveCardFromHand(playedCard.Value, playedCard.Suit);
+        
+        _areMatchingCards = CheckMatchingCardsOnTable(LocalPlayer, playedCard);
         
         // Check if the player invoking the method is the local player
         if (LocalPlayer.OwnerClientId == playerId)
@@ -301,5 +307,26 @@ public class Game : NetworkBehaviour
         
         player.SetCards(cards);
         _onCardsDealt?.Invoke(player.OwnerClientId);
+    }
+    
+    private bool CheckMatchingCardsOnTable(Player player, Card card)
+    {
+        if (_table.Cards.Count <= 0) return false;
+        if (!IsMatchingCardOnTable(card.Value)) return false;
+        Debug.Log($"Player {player.OwnerClientId} has a matching card on the table: {card.Value}");
+        return true;
+    }
+
+    private bool IsMatchingCardOnTable(Value playedCardValue)
+    {
+        // Iterate through the cards on the table and check if any of them have the same value
+        return _table.Cards.Any(cardOnTable => cardOnTable.Value == playedCardValue);
+    }
+    
+    private void AddScoreToLastPlayer(Player lastPlayer, uint score)
+    {
+        lastPlayer.Score += score;
+
+        Debug.Log($"Player {lastPlayer.OwnerClientId} scored {score} points. Total score: {lastPlayer.Score}");
     }
 }
