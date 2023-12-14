@@ -57,22 +57,12 @@ public class Player : NetworkBehaviour
     
     public void RemoveCardFromHand(Value value, Suit suit)
     {
-        Debug.Log($"Before removal: CardsInHand count = {cardsInHand.Count}");
-        Debug.Log($"Removing card: {value} {suit}");
-
         Card cardToRemove = cardsInHand.Find(c => c.Value == value && c.Suit == suit);
 
         if (cardToRemove != null)
         {
             cardsInHand.Remove(cardToRemove);
-            Debug.Log($"{cardToRemove.Value}_{cardToRemove.Suit} has been removed from list.");
         }
-        else
-        {
-            Debug.Log("Attempted to remove a card not present in the hand.");
-        }
-
-        Debug.Log($"After removal: CardsInHand count = {cardsInHand.Count}");
     }
 
 

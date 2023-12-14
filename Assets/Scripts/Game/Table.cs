@@ -12,14 +12,24 @@ public class Table : MonoBehaviour
     {
         this.cards = cards;
     }
-    
+
     public void AddCardToTable(Card card)
     {
         cards.Add(card);
     }
-    
-    public bool HasCardBeenPlayed(Card card)
+
+    public void RemoveCardFromTable(Value value, Suit suit)
     {
-        return cards.Contains(card);
+        Card cardToRemove = cards.Find(c => c.Value == value && c.Suit == suit);
+
+        if (cardToRemove != null)
+        {
+            cards.Remove(cardToRemove);
+        }
+        else
+        {
+            Debug.Log("Attempted to remove a card not present in the hand.");
+        }
     }
 }
+
