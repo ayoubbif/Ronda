@@ -127,7 +127,6 @@ public class Game : NetworkBehaviour
     #endregion
     
     #region RPC
-    
     [ClientRpc]
     private void InitDeckClientRpc(int[] deck)
     {
@@ -186,41 +185,6 @@ public class Game : NetworkBehaviour
         }
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    public void NotifyServerOnCardPlayedServerRpc(int codedCard, ulong playerId)
-    {
-        // Decode the coded card to get the suit and value
-        Card playedCard = CardConverter.DecodeCodedCard(codedCard);
-        
-        // Find the player who played the card
-        Player player = Players.FirstOrDefault(p => p.OwnerClientId == playerId);
-                    
-        Debug.Log($"{playedCard.Value}, {playedCard.Suit}");
-        
-        // Check if the player is found
-        if (player != null)
-        {
-            // Notify the other player about the played card
-            NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
-
-
-            if (_areMatchingCards)
-            {
-                NotifyServerToRemoveMatchingCardsClientRpc(codedCard);
-                AddScoreToLastPlayer(player, 2);
-            }
-
-            
-            // Check for empty hand and deal new cards
-            CheckForEmptyHandAndDeal();
-        }
-        else
-        {
-            Debug.LogError($"Player not found with ID: {playerId}");
-        }
-    }
-
-
     [ClientRpc]
     private void NotifyServerOnCardPlayedClientRpc(int codedCard, ulong playerId)
     {
@@ -230,13 +194,14 @@ public class Game : NetworkBehaviour
         // Remove the played card from the player's hand
         LocalPlayer.RemoveCardFromHand(playedCard.Value, playedCard.Suit);
         
-        _areMatchingCards = CheckMatchingCardsOnTable(playedCard);
+        CheckMatchingCardsOnTableClientRpc(playedCard);
         
         // Check if the player invoking the method is the local player
         if (LocalPlayer.OwnerClientId == playerId)
         {
             return;
         }
+        
         // Spawn the played card on the table for other players
         GameObject playedCardObject = Instantiate(cardPrefab, _table.transform);
         Image playedCardImage = playedCardObject.GetComponent<Image>();
@@ -254,8 +219,9 @@ public class Game : NetworkBehaviour
             playedCardImage.sprite = sprite;
             playedCardObject.name = $"{(int)playedCard.Suit}_{(int)playedCard.Value}";
         }
-            
-        _table.AddCardToTable(playedCard);
+        
+        if(!_areMatchingCards)
+            _table.AddCardToTable(playedCard);
         
         _isEmptyHanded = LocalPlayer.CardsInHand.Count == 0;
     }
@@ -264,29 +230,26 @@ public class Game : NetworkBehaviour
     private void NotifyServerToRemoveMatchingCardsClientRpc(int codedCard)
     {
         // Decode the coded card to get the suit and value
-        Card scoredCard = CardConverter.DecodeCodedCard(codedCard);
+        var scoredCard = CardConverter.DecodeCodedCard(codedCard);
 
         // Create a list to store cards that need to be removed from the table
-        List<Card> cardsToRemove = new List<Card>();
+        var cardsToRemove = new HashSet<Card>();
+        var cardsOnTable = _table.Cards.ToHashSet();
 
         // Iterate through cards on the table to find matching cards
-        foreach (var cardOnTable in _table.Cards.Where(cardOnTable => cardOnTable.Value == scoredCard.Value))
+        foreach (var cardOnTable in cardsOnTable.Where(cardOnTable => cardOnTable.Value == scoredCard.Value))
         {
-            Debug.Log($"cardOnTable: {cardOnTable.Value}, {cardOnTable.Suit}");
-
             // Add matching cards to the list for removal
             cardsToRemove.Add(cardOnTable);
-            _table.RemoveCardFromTable(cardOnTable.Value, cardOnTable.Suit);
 
             // Also add the scored card to the list for removal
             cardsToRemove.Add(scoredCard);
-            _table.RemoveCardFromTable(scoredCard.Value, scoredCard.Suit);
         }
-
+        
         // Output the cards that are going to be removed
         foreach (var cardToRemove in cardsToRemove)
         {
-            Debug.Log($"cardToRemove: {cardToRemove.Value}, {cardToRemove.Suit}");
+            _table.RemoveCardFromTable(cardToRemove.Value, cardToRemove.Suit);
         }
 
         // Invoke the RPC to set corresponding GameObjects inactive on clients
@@ -307,7 +270,38 @@ public class Game : NetworkBehaviour
         }
     }
 
-    
+        
+    [ServerRpc(RequireOwnership = false)]
+    public void OnCardPlayedServerRpc(int codedCard, ulong playerId)
+    {
+        // Find the player who played the card
+        var player = Players.FirstOrDefault(p => p.OwnerClientId == playerId);
+
+        // Check if the player is found
+        if (player != null)
+        {
+            // Notify the other player about the played card
+            NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
+                    
+            if (_areMatchingCards)
+            {
+                NotifyServerToRemoveMatchingCardsClientRpc(codedCard);
+                
+                foreach (var card in _table.Cards)
+                {
+                    Debug.Log($"ServerRpc: {card.Value}_{card.Suit}");
+                }
+                //AddScoreToLastPlayer(player, 2);
+            }
+            
+            // Check for empty hand and deal new cards
+            CheckForEmptyHandAndDeal();
+        }
+        else
+        {
+            Debug.LogError($"Player not found with ID: {playerId}");
+        }
+    }
     #endregion
     
     private void InitDeck(int[] deck)
@@ -351,11 +345,11 @@ public class Game : NetworkBehaviour
         _onCardsDealt?.Invoke(player.OwnerClientId);
     }
     
-    private bool CheckMatchingCardsOnTable(Card card)
+    [ClientRpc]
+    public void CheckMatchingCardsOnTableClientRpc(Card card)
     {
-        if (_table.Cards.Count <= 0) return false;
-        if (!IsMatchingCardOnTable(card.Value)) return false;
-        return true;
+        if (_table.Cards.Count <= 0) return;
+        _areMatchingCards = IsMatchingCardOnTable(card.Value);
     }
 
     private bool IsMatchingCardOnTable(Value playedCardValue)
@@ -367,7 +361,9 @@ public class Game : NetworkBehaviour
     private GameObject FindCardObjectOnTable(Card card)
     {
         // Iterate through the children of the table to find the card GameObject
-        return (from Transform child in _table.transform where child.name == $"{(int)card.Suit}_{(int)card.Value}" select child.gameObject).FirstOrDefault();
+        return (from Transform child in _table.transform
+            where child.name == $"{(int)card.Suit}_{(int)card.Value}"
+            select child.gameObject).FirstOrDefault();
     }
     
     private void AddScoreToLastPlayer(Player lastPlayer, uint score)
@@ -375,5 +371,22 @@ public class Game : NetworkBehaviour
         lastPlayer.Score += score;
 
         Debug.Log($"Player {lastPlayer.OwnerClientId} scored {score} points. Total score: {lastPlayer.Score}");
+    }
+    private void RemoveLastCardFromTable()
+    {
+        if (_table.Cards.Count > 0)
+        {
+            // Get the index of the last card in the list
+            int lastIndex = _table.Cards.Count - 1;
+
+            // Remove the last card from the list
+            _table.Cards.RemoveAt(lastIndex);
+
+            Debug.Log($"Removed the last card from the table.");
+        }
+        else
+        {
+            Debug.Log("Table is already empty. No card to remove.");
+        }
     }
 }
