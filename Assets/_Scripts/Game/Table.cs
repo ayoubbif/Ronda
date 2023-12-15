@@ -1,14 +1,19 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
-[System.Serializable]
 public class Table : MonoBehaviour
 {
-    public List<Card> Cards => cards.ToList();
+    public List<Card> Cards
+    {
+        get => cards.ToList();
+        set => cards = value.ToList();
+    }
     [SerializeField] private List<Card> cards;
 
     public Table(List<Card> cards)
@@ -21,7 +26,7 @@ public class Table : MonoBehaviour
         cards.Add(card);
     }
 
-    public void RemoveCardFromTable(Value value, Suit suit)
+    public void RemoveCardFromTable(Suit suit, Value value)
     {
         Card cardToRemove = cards.Find(c => c.Value == value && c.Suit == suit);
 

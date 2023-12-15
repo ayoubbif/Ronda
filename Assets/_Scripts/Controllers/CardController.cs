@@ -95,8 +95,6 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
         var localPlayerId = Game.LocalPlayer.OwnerClientId;
         
         Game.OnCardPlayedServerRpc(CardConverter.GetCodedCard(_card), localPlayerId);
-        
-        GetComponentInParent<Table>().AddCardToTable(_card);
     }
     
     private Card GetCardValue()
@@ -110,7 +108,6 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
                 _card = new Card((Suit)suitValue, (Value)valueValue);
             }
         }
-        
         return _card;
     }
 

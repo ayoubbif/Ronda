@@ -27,6 +27,7 @@ public class Game : NetworkBehaviour
     
     private Deck _deck;
     private bool _isDeckInitialized;
+    private Card _scoredCard;
 
     [SerializeField] private Table _table;
     
@@ -54,11 +55,20 @@ public class Game : NetworkBehaviour
             Destroy(gameObject);
         }
     }
-    
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            _table.RemoveCardFromTable( _scoredCard.Suit, _scoredCard.Value);
+        }
+    }
+
     private void Start()
     {
         _cardImage = cardPrefab.GetComponent<Image>();
     }
+    
     
     private void CheckForEmptyHandAndDeal()
     {
@@ -195,7 +205,7 @@ public class Game : NetworkBehaviour
         LocalPlayer.RemoveCardFromHand(playedCard.Value, playedCard.Suit);
         
         CheckMatchingCardsOnTableClientRpc(playedCard);
-        
+
         // Check if the player invoking the method is the local player
         if (LocalPlayer.OwnerClientId == playerId)
         {
@@ -220,41 +230,44 @@ public class Game : NetworkBehaviour
             playedCardObject.name = $"{(int)playedCard.Suit}_{(int)playedCard.Value}";
         }
         
-        if(!_areMatchingCards)
-            _table.AddCardToTable(playedCard);
-        
         _isEmptyHanded = LocalPlayer.CardsInHand.Count == 0;
+    }
+        
+    [ClientRpc]
+    private void CheckMatchingCardsOnTableClientRpc(Card card)
+    {
+        if (_table.Cards.Count <= 0) return;
+        _areMatchingCards = IsMatchingCardOnTable(card.Value);
     }
     
     [ClientRpc]
-    private void NotifyServerToRemoveMatchingCardsClientRpc(int codedCard)
+    private void NotifyServerToRemoveMatchingCardsClientRpc(Card card)
     {
         // Decode the coded card to get the suit and value
-        var scoredCard = CardConverter.DecodeCodedCard(codedCard);
-
+        _scoredCard = card;
+        
         // Create a list to store cards that need to be removed from the table
         var cardsToRemove = new HashSet<Card>();
         var cardsOnTable = _table.Cards.ToHashSet();
 
         // Iterate through cards on the table to find matching cards
-        foreach (var cardOnTable in cardsOnTable.Where(cardOnTable => cardOnTable.Value == scoredCard.Value))
+        foreach (var cardOnTable in cardsOnTable.Where(cardOnTable => cardOnTable.Value == _scoredCard.Value))
         {
+            // Add the scored card to the list for removal
+            cardsToRemove.Add(_scoredCard);
             // Add matching cards to the list for removal
             cardsToRemove.Add(cardOnTable);
-
-            // Also add the scored card to the list for removal
-            cardsToRemove.Add(scoredCard);
         }
         
-        // Output the cards that are going to be removed
         foreach (var cardToRemove in cardsToRemove)
         {
-            _table.RemoveCardFromTable(cardToRemove.Value, cardToRemove.Suit);
+            _table.RemoveCardFromTable(cardToRemove.Suit, cardToRemove.Value);
         }
-
+        
         // Invoke the RPC to set corresponding GameObjects inactive on clients
         SetCardObjectsInactiveClientRpc(cardsToRemove.ToArray());
     }
+
 
     [ClientRpc]
     private void SetCardObjectsInactiveClientRpc(Card[] cardsToRemove)
@@ -269,6 +282,11 @@ public class Game : NetworkBehaviour
             }
         }
     }
+    [ClientRpc]
+    private void AddCardToTableClientRpc(Card card)
+    {
+        _table.AddCardToTable(card);
+    }
 
         
     [ServerRpc(RequireOwnership = false)]
@@ -276,23 +294,17 @@ public class Game : NetworkBehaviour
     {
         // Find the player who played the card
         var player = Players.FirstOrDefault(p => p.OwnerClientId == playerId);
-
+        
+        // Decode the coded card to get the suit and value
+        Card playedCard = CardConverter.DecodeCodedCard(codedCard);
+        
         // Check if the player is found
         if (player != null)
         {
             // Notify the other player about the played card
             NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
-                    
-            if (_areMatchingCards)
-            {
-                NotifyServerToRemoveMatchingCardsClientRpc(codedCard);
-                
-                foreach (var card in _table.Cards)
-                {
-                    Debug.Log($"ServerRpc: {card.Value}_{card.Suit}");
-                }
-                //AddScoreToLastPlayer(player, 2);
-            }
+
+            AddCardToTableClientRpc(playedCard);
             
             // Check for empty hand and deal new cards
             CheckForEmptyHandAndDeal();
@@ -301,7 +313,12 @@ public class Game : NetworkBehaviour
         {
             Debug.LogError($"Player not found with ID: {playerId}");
         }
+
+        if (!_areMatchingCards) return;
+        NotifyServerToRemoveMatchingCardsClientRpc(playedCard);
+        AddScoreToLastPlayer(player, 2);
     }
+
     #endregion
     
     private void InitDeck(int[] deck)
@@ -344,13 +361,6 @@ public class Game : NetworkBehaviour
         player.SetCards(cards);
         _onCardsDealt?.Invoke(player.OwnerClientId);
     }
-    
-    [ClientRpc]
-    public void CheckMatchingCardsOnTableClientRpc(Card card)
-    {
-        if (_table.Cards.Count <= 0) return;
-        _areMatchingCards = IsMatchingCardOnTable(card.Value);
-    }
 
     private bool IsMatchingCardOnTable(Value playedCardValue)
     {
@@ -371,22 +381,5 @@ public class Game : NetworkBehaviour
         lastPlayer.Score += score;
 
         Debug.Log($"Player {lastPlayer.OwnerClientId} scored {score} points. Total score: {lastPlayer.Score}");
-    }
-    private void RemoveLastCardFromTable()
-    {
-        if (_table.Cards.Count > 0)
-        {
-            // Get the index of the last card in the list
-            int lastIndex = _table.Cards.Count - 1;
-
-            // Remove the last card from the list
-            _table.Cards.RemoveAt(lastIndex);
-
-            Debug.Log($"Removed the last card from the table.");
-        }
-        else
-        {
-            Debug.Log("Table is already empty. No card to remove.");
-        }
     }
 }
