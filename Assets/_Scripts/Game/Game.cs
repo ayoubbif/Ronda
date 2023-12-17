@@ -2,8 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using TMPro;
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.SocialPlatforms.Impl;
 using UnityEngine.UI;
 
 
@@ -21,7 +23,7 @@ public class Game : NetworkBehaviour
     private Image _cardImage;
     private int _numCardsToDeal;
     private Action<ulong> _onCardsDealt;
-    private Action<bool> _onEmptyHands;
+    private Action _onMatchingCards;
     private bool _isEmptyHanded;
     private bool _areMatchingCards;
     
@@ -30,7 +32,8 @@ public class Game : NetworkBehaviour
     private Card _scoredCard;
 
     [SerializeField] private Table _table;
-    
+    public TMP_Text scoreText;
+     
     
     public Player LocalPlayer => GetLocalPlayer();
 
@@ -56,27 +59,10 @@ public class Game : NetworkBehaviour
         }
     }
 
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.K))
-        {
-            _table.RemoveCardFromTable( _scoredCard.Suit, _scoredCard.Value);
-        }
-    }
 
     private void Start()
     {
         _cardImage = cardPrefab.GetComponent<Image>();
-    }
-    
-    
-    private void CheckForEmptyHandAndDeal()
-    {
-        // Check if there are exactly 2 players and both players have empty hands
-        if (Players.Count != 2 || !_isEmptyHanded) return;
-        
-        Debug.Log(LocalPlayer.CardsInHand.Count);
-        StartCoroutine(DealAfterDelay(1f));
     }
 
     public void AddPlayer(Player newPlayer)
@@ -136,7 +122,7 @@ public class Game : NetworkBehaviour
     
     #endregion
     
-    #region RPC
+    #region ClientRPC
     [ClientRpc]
     private void InitDeckClientRpc(int[] deck)
     {
@@ -230,16 +216,14 @@ public class Game : NetworkBehaviour
             playedCardObject.name = $"{(int)playedCard.Suit}_{(int)playedCard.Value}";
         }
         
-        _isEmptyHanded = LocalPlayer.CardsInHand.Count == 0;
+        _isEmptyHanded = players.All(player => player.CardsInHand.Count == 0);
     }
-        
+
     [ClientRpc]
     private void CheckMatchingCardsOnTableClientRpc(Card card)
     {
-        if (_table.Cards.Count <= 0) return;
         _areMatchingCards = IsMatchingCardOnTable(card.Value);
     }
-    
     [ClientRpc]
     private void NotifyServerToRemoveMatchingCardsClientRpc(Card card)
     {
@@ -267,8 +251,6 @@ public class Game : NetworkBehaviour
         // Invoke the RPC to set corresponding GameObjects inactive on clients
         SetCardObjectsInactiveClientRpc(cardsToRemove.ToArray());
     }
-
-
     [ClientRpc]
     private void SetCardObjectsInactiveClientRpc(Card[] cardsToRemove)
     {
@@ -281,14 +263,18 @@ public class Game : NetworkBehaviour
                 cardObject.SetActive(false);
             }
         }
+
     }
     [ClientRpc]
     private void AddCardToTableClientRpc(Card card)
     {
         _table.AddCardToTable(card);
     }
+    
+    #endregion
 
-        
+    #region ServerRPC
+    
     [ServerRpc(RequireOwnership = false)]
     public void OnCardPlayedServerRpc(int codedCard, ulong playerId)
     {
@@ -297,28 +283,28 @@ public class Game : NetworkBehaviour
         
         // Decode the coded card to get the suit and value
         Card playedCard = CardConverter.DecodeCodedCard(codedCard);
-        
+     
         // Check if the player is found
         if (player != null)
         {
-            // Notify the other player about the played card
             NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
-
             AddCardToTableClientRpc(playedCard);
-            
-            // Check for empty hand and deal new cards
             CheckForEmptyHandAndDeal();
+
+            if (_areMatchingCards)
+            {
+                const uint scoreToAdd = 2;
+                player.AddScore(scoreToAdd);
+                Debug.Log($"Player {playerId} scored {scoreToAdd} points. Total score: {player.Score}");
+                NotifyServerToRemoveMatchingCardsClientRpc(playedCard);
+            }
         }
         else
         {
             Debug.LogError($"Player not found with ID: {playerId}");
         }
-
-        if (!_areMatchingCards) return;
-        NotifyServerToRemoveMatchingCardsClientRpc(playedCard);
-        AddScoreToLastPlayer(player, 2);
     }
-
+    
     #endregion
     
     private void InitDeck(int[] deck)
@@ -328,7 +314,6 @@ public class Game : NetworkBehaviour
         if(IsServer)
             Debug.Log($"Deck created: {string.Join(", ", deck)}.");
     }
-    
     private void DealFromDeck()
     {
         _numCardsToDeal = _deck.Cards.Count == 4 ? 2 : 3;
@@ -338,6 +323,7 @@ public class Game : NetworkBehaviour
             // Ensure that the player.Cards array is initialized with the correct size
             player.InitializeCards(_numCardsToDeal);
 
+            if(_deck.Cards.Count == 0) return;
             for (int i = 0; i < _numCardsToDeal; i++)
             {
                 var card = _deck.PullCard();
@@ -348,7 +334,14 @@ public class Game : NetworkBehaviour
             SetPlayersCardsClientRpc(player.OwnerClientId, player.Cards);
         }
     }
-    
+    private void CheckForEmptyHandAndDeal()
+    {
+        // Check if there are exactly 2 players and both players have empty hands
+        if (Players.Count != 2 || !_isEmptyHanded) return;
+        
+        Debug.Log(LocalPlayer.CardsInHand.Count);
+        StartCoroutine(DealAfterDelay(2f));
+    }
     private void SetPlayersCards(ulong playerId, Card[] cards)
     {
         Player player = players.FirstOrDefault(x => x != null && x.OwnerClientId == playerId);
@@ -361,13 +354,15 @@ public class Game : NetworkBehaviour
         player.SetCards(cards);
         _onCardsDealt?.Invoke(player.OwnerClientId);
     }
-
     private bool IsMatchingCardOnTable(Value playedCardValue)
     {
         // Iterate through the cards on the table and check if any of them have the same value
         return _table.Cards.Any(cardOnTable => cardOnTable.Value == playedCardValue);
     }
-
+    public void UpdateScoreUI()
+    {
+        scoreText.text = LocalPlayer.Score.ToString();
+    }
     private GameObject FindCardObjectOnTable(Card card)
     {
         // Iterate through the children of the table to find the card GameObject
@@ -375,11 +370,5 @@ public class Game : NetworkBehaviour
             where child.name == $"{(int)card.Suit}_{(int)card.Value}"
             select child.gameObject).FirstOrDefault();
     }
-    
-    private void AddScoreToLastPlayer(Player lastPlayer, uint score)
-    {
-        lastPlayer.Score += score;
 
-        Debug.Log($"Player {lastPlayer.OwnerClientId} scored {score} points. Total score: {lastPlayer.Score}");
-    }
 }

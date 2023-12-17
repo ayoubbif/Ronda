@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using TMPro;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -28,7 +30,6 @@ public class Player : NetworkBehaviour
     }
 
     [SerializeField] private List<Card> cardsInHand;
-    
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -37,6 +38,22 @@ public class Player : NetworkBehaviour
         {
             AddPlayerServerRpc();
         }
+    }
+    
+    private void Start()
+    {
+        _score.OnValueChanged += ScoreChanged;
+    }
+
+    public override void OnDestroy()
+    {
+        _score.OnValueChanged -= ScoreChanged;
+    }
+
+    private static void ScoreChanged(uint oldValue, uint newValue)
+    {
+        // Notify Game instance to update score UI
+        Game.Instance.UpdateScoreUI();
     }
     
     public void InitializeCards(int size)
@@ -54,6 +71,10 @@ public class Player : NetworkBehaviour
         cardsInHand = cards;
     }
     
+    public void AddScore(uint score)
+    {
+        _score.Value += score;
+    }
     
     public void RemoveCardFromHand(Value value, Suit suit)
     {
@@ -64,8 +85,6 @@ public class Player : NetworkBehaviour
             cardsInHand.Remove(cardToRemove);
         }
     }
-
-
     
     [ClientRpc]
     private void AddPlayerClientRpc()
@@ -80,6 +99,4 @@ public class Player : NetworkBehaviour
         // Call the client RPC to add the player on all clients
         AddPlayerClientRpc();
     }
-
-
 }
