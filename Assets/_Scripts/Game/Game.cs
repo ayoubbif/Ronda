@@ -23,13 +23,13 @@ public class Game : NetworkBehaviour
     private Image _cardImage;
     private int _numCardsToDeal;
     private Action<ulong> _onCardsDealt;
-    private Action _onMatchingCards;
     private bool _isEmptyHanded;
     private bool _areMatchingCards;
     
     private Deck _deck;
     private bool _isDeckInitialized;
     private Card _scoredCard;
+    [SerializeField] private List<Card> _straightCards = new();
 
     [SerializeField] private Table _table;
     public TMP_Text scoreText;
@@ -196,7 +196,7 @@ public class Game : NetworkBehaviour
         _areMatchingCards = IsMatchingCardOnTable(card.Value);
     }
     [ClientRpc]
-    private void NotifyServerToRemoveMatchingCardsClientRpc(Card card)
+    private void NotifyServerToRemoveMatchingCardsClientRpc(Card card, Card[] sequence)
     {
         // Decode the coded card to get the suit and value
         _scoredCard = card;
@@ -212,6 +212,11 @@ public class Game : NetworkBehaviour
             cardsToRemove.Add(_scoredCard);
             // Add matching cards to the list for removal
             cardsToRemove.Add(cardOnTable);
+
+            foreach (var c in sequence)
+            {
+                cardsToRemove.Add(c);
+            }
         }
         
         foreach (var cardToRemove in cardsToRemove)
@@ -261,13 +266,23 @@ public class Game : NetworkBehaviour
             NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
             AddCardToTableClientRpc(playedCard);
             CheckForEmptyHandAndDeal();
+            
+            var sequenceScore = CheckSequenceScore(playedCard.Value);
 
             if (_areMatchingCards)
             {
-                const uint scoreToAdd = 2;
-                player.AddScore(scoreToAdd);
-                Debug.Log($"Player {playerId} scored {scoreToAdd} points. Total score: {player.Score}");
-                NotifyServerToRemoveMatchingCardsClientRpc(playedCard);
+                if(sequenceScore > 0)
+                {
+                    // Add score if sequence is greater than 0
+                    player.AddScore((uint)sequenceScore);
+                    Debug.Log($"Player {playerId} scored {sequenceScore} points by sequence. Total score: {player.Score}");
+                }
+                
+                const uint matchedScoreToAdd = 2;
+                player.AddScore(matchedScoreToAdd);
+                
+                Debug.Log($"Player {playerId} scored {matchedScoreToAdd} points. Total score: {player.Score}");
+                NotifyServerToRemoveMatchingCardsClientRpc(playedCard, _straightCards.ToArray());
             }
         }
         else
@@ -377,7 +392,6 @@ public class Game : NetworkBehaviour
         // Iterate through the cards on the table and check if any of them have the same value
         return _table.Cards.Any(cardOnTable => cardOnTable.Value == playedCardValue);
     }
-    
     public void UpdateScoreUI()
     {
         scoreText.text = LocalPlayer.Score.ToString();
@@ -388,5 +402,27 @@ public class Game : NetworkBehaviour
         return (from Transform child in _table.transform
             where child.name == $"{(int)card.Suit}_{(int)card.Value}"
             select child.gameObject).FirstOrDefault();
+    }
+    private int CheckSequenceScore(Value playedCardValue)
+    {
+        _straightCards = new List<Card>();
+
+        var sortedCards = _table.Cards.OrderBy(x => x.Value).ToList();
+
+        for (int i = 0; i < sortedCards.Count; i++)
+        {
+            // find the played card in the sorted list
+            if (sortedCards[i].Value != playedCardValue) continue;
+
+            var j = i;              
+            // look for cards to the right of the played card that continue the sequence
+            while (j < sortedCards.Count - 1 && sortedCards[j + 1].Value == sortedCards[j].Value + 1)
+            {
+                j++;
+                _straightCards.Add(sortedCards[j]);
+            }
+        }
+        
+        return _straightCards.Count; 
     }
 }
