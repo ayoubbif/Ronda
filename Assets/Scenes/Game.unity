@@ -1299,8 +1299,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cardPrefab: {fileID: 1000016203661699412, guid: 0ea604cdbe9466949846caad89a3c9a2, type: 3}
-  hand: {fileID: 1727611296122602385}
+  playerHand: {fileID: 1727611296122602385}
+  enemyHand: {fileID: 2110943522}
   players: []
+  _straightCards: []
   _table: {fileID: 4559461925432081297}
   scoreText: {fileID: 2515157261046200120}
 --- !u!4 &1525513369
@@ -1625,8 +1627,8 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6173613606048058268}
-  - {fileID: 108054002}
   - {fileID: 4362626133588524751}
+  - {fileID: 108054002}
   - {fileID: 214457450}
   - {fileID: 1776865442}
   - {fileID: 202138239445458495}
@@ -1964,7 +1966,7 @@ GameObject:
   - component: {fileID: 2110943524}
   - component: {fileID: 2110943523}
   m_Layer: 5
-  m_Name: Hand
+  m_Name: EnemyHand
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2307,7 +2309,7 @@ GameObject:
   - component: {fileID: 6329543986973611745}
   - component: {fileID: 2973806752483538163}
   m_Layer: 5
-  m_Name: Hand
+  m_Name: PlayerHand
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

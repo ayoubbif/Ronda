@@ -5,7 +5,6 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using Unity.Netcode;
-using UnityEngine.SocialPlatforms.Impl;
 using UnityEngine.UI;
 
 
@@ -14,8 +13,8 @@ public class Game : NetworkBehaviour
     public static Game Instance { get; private set; }
     
     [SerializeField] private GameObject cardPrefab;
-    [SerializeField] private Transform hand;
-    
+    [SerializeField] private Transform playerHand;
+    [SerializeField] private Transform enemyHand;
     public List<Player> Players => players.ToList();
     [SerializeField] private List<Player> players = new();
     private readonly int _maxNumPlayers = 2;
@@ -40,11 +39,13 @@ public class Game : NetworkBehaviour
     private void OnEnable()
     {
         _onCardsDealt += SpawnCardsClientRpc;
+        _onCardsDealt += SpawnEnemyClientRpc;
     }
     
     private void OnDisable()
     {
         _onCardsDealt -= SpawnCardsClientRpc;
+        _onCardsDealt -= SpawnEnemyClientRpc;
     }
 
     private void Awake()
@@ -149,9 +150,19 @@ public class Game : NetworkBehaviour
         if (IsClient && LocalPlayer.OwnerClientId == playerId)
         {
             InitLocalPlayerCards();
+        
         }
     }
-
+        
+    [ClientRpc]
+    private void SpawnEnemyClientRpc(ulong playerId)
+    {
+        // Check if the current instance is the local player's client
+        if (IsClient && LocalPlayer.OwnerClientId == playerId)
+        {
+            InitEnemyPlayerCards();
+        }
+    }
     [ClientRpc]
     private void NotifyServerOnCardPlayedClientRpc(int codedCard, ulong playerId)
     {
@@ -247,6 +258,17 @@ public class Game : NetworkBehaviour
         _table.AddCardToTable(card);
     }
     
+    [ClientRpc]
+    public void RemoveCardFromEnemyHandClientRpc(ulong playerId)
+    {
+        if(NetworkManager.Singleton.LocalClientId != playerId) 
+        {
+            if(enemyHand.childCount <= 0) return;
+            GameObject lastCard = enemyHand.GetChild(enemyHand.childCount - 1).gameObject;
+            Destroy(lastCard);
+        }
+    }
+    
     #endregion
 
     #region ServerRPC
@@ -264,6 +286,9 @@ public class Game : NetworkBehaviour
         if (player != null)
         {
             NotifyServerOnCardPlayedClientRpc(codedCard, playerId);
+    
+            RemoveCardFromEnemyHandClientRpc(playerId);
+            
             AddCardToTableClientRpc(playedCard);
             CheckForEmptyHandAndDeal();
             
@@ -332,7 +357,7 @@ public class Game : NetworkBehaviour
     {
         for (int i = 0; i < LocalPlayer.Cards.Length; i++)
         {
-            var cardInstance = Instantiate(cardPrefab, hand);
+            var cardInstance = Instantiate(cardPrefab, playerHand);
             UpdateCardImage(LocalPlayer.Cards[i], cardInstance);
         }
     }
@@ -375,6 +400,35 @@ public class Game : NetworkBehaviour
         // Update the card images based on the player's hand
         UpdateCardImages();
     }
+    private void InitEnemyPlayerCards()
+    {
+        if (LocalPlayer.Cards == null)
+        {
+            LocalPlayer.InitializeCards(_numCardsToDeal);
+            return;
+        }
+        // Update the card images based on the player's hand
+        UpdateEnemyCardImages();
+    }
+       
+    private void UpdateEnemyCardImages()
+    {
+        for (int i = 0; i < LocalPlayer.Cards.Length; i++)
+        {
+            var cardInstance = Instantiate(cardPrefab, enemyHand);
+            UpdateEnemyCardImage(cardInstance);
+        }
+    }
+    
+    private void UpdateEnemyCardImage(GameObject cardInstance)
+    {
+        var cardImage = cardInstance.GetComponent<Image>();
+        string spritePath = "Sprites/Cards/Back";
+        Sprite sprite = LoadSprite(spritePath);
+        cardImage.sprite = sprite;
+        cardInstance.name = $"Enemy_Card_{cardInstance.GetInstanceID()}";
+    }
+    
     private void SetPlayersCards(ulong playerId, Card[] cards)
     {
         Player player = players.FirstOrDefault(x => x != null && x.OwnerClientId == playerId);
