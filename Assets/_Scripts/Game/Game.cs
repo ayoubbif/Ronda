@@ -148,35 +148,7 @@ public class Game : NetworkBehaviour
         // Check if the current instance is the local player's client
         if (IsClient && LocalPlayer.OwnerClientId == playerId)
         {
-            if (LocalPlayer.Cards == null)
-            {
-                LocalPlayer.InitializeCards(_numCardsToDeal);
-                return;
-            }
-        
-            // Update the card images based on the player's hand
-            for (int i = 0; i < LocalPlayer.Cards.Length; i++)
-            {
-                var cardInstance = Instantiate(cardPrefab, hand);
-                var cardImage = cardInstance.GetComponent<Image>();
-                
-                Suit cardSuit = LocalPlayer.Cards[i].Suit;
-                Value cardValue = LocalPlayer.Cards[i].Value;
-
-
-                string path = $"Sprites/Cards/{(int)cardSuit}_{(int)cardValue}";
-                Sprite sprite = Resources.Load<Sprite>(path);
-
-                if (sprite == null)
-                {
-                    Debug.LogError($"Sprite not found at path: {path}");
-                }
-                else
-                {
-                    cardImage.sprite = sprite;
-                    cardInstance.name = $"{(int)cardSuit}_{(int)cardValue}";
-                }
-            }
+            InitLocalPlayerCards();
         }
     }
 
@@ -341,6 +313,53 @@ public class Game : NetworkBehaviour
         Debug.Log(LocalPlayer.CardsInHand.Count);
         StartCoroutine(DealAfterDelay(2f));
     }
+    private void UpdateCardImages()
+    {
+        for (int i = 0; i < LocalPlayer.Cards.Length; i++)
+        {
+            var cardInstance = Instantiate(cardPrefab, hand);
+            UpdateCardImage(LocalPlayer.Cards[i], cardInstance);
+        }
+    }
+    private void UpdateCardImage(Card card, GameObject cardInstance)
+    {
+        var cardImage = cardInstance.GetComponent<Image>();
+                
+        Suit cardSuit = card.Suit;
+        Value cardValue = card.Value;
+
+        string spritePath = GetSpriteFilePath(cardSuit, cardValue);
+        Sprite sprite = LoadSprite(spritePath);
+
+        cardImage.sprite = sprite;
+        cardInstance.name = $"{(int)cardSuit}_{(int)cardValue}";
+    }
+    private string GetSpriteFilePath(Suit cardSuit, Value cardValue)
+    {
+        return $"Sprites/Cards/{(int)cardSuit}_{(int)cardValue}";
+    }
+    private Sprite LoadSprite(string spritePath)
+    {
+        Sprite sprite = Resources.Load<Sprite>(spritePath);
+
+        if (sprite == null)
+        {
+            Debug.LogError($"Sprite not found at path: {spritePath}");
+        }
+
+        return sprite;
+    }
+    private void InitLocalPlayerCards()
+    {
+        if (LocalPlayer.Cards == null)
+        {
+            LocalPlayer.InitializeCards(_numCardsToDeal);
+            return;
+        }
+
+        // Update the card images based on the player's hand
+        UpdateCardImages();
+    }
     private void SetPlayersCards(ulong playerId, Card[] cards)
     {
         Player player = players.FirstOrDefault(x => x != null && x.OwnerClientId == playerId);
@@ -358,6 +377,7 @@ public class Game : NetworkBehaviour
         // Iterate through the cards on the table and check if any of them have the same value
         return _table.Cards.Any(cardOnTable => cardOnTable.Value == playedCardValue);
     }
+    
     public void UpdateScoreUI()
     {
         scoreText.text = LocalPlayer.Score.ToString();
@@ -369,5 +389,4 @@ public class Game : NetworkBehaviour
             where child.name == $"{(int)card.Suit}_{(int)card.Value}"
             select child.gameObject).FirstOrDefault();
     }
-
 }
