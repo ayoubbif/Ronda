@@ -96,7 +96,6 @@ public class Player : NetworkBehaviour
     [ServerRpc]
     private void AddPlayerServerRpc()
     {
-        // Call the client RPC to add the player on all clients
         AddPlayerClientRpc();
     }
 }

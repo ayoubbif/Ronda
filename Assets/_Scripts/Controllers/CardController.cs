@@ -88,27 +88,14 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     private void PlayCardOnTable(Transform table)
     {
         SetCardParentAndPosition(table);
-        
-        _value = GetCardValue().Value;
-        _suit = GetCardValue().Suit;
+
+        _card = CardConverter.GetCardValueFromGameObject(gameObject);
+        _value = _card.Value;
+        _suit = _card.Suit;
 
         var localPlayerId = Game.LocalPlayer.OwnerClientId;
-        
+
         Game.OnCardPlayedServerRpc(CardConverter.GetCodedCard(_card), localPlayerId);
-    }
-    
-    private Card GetCardValue()
-    {
-        // Extracting card suit and value from the GameObject's name
-        string[] nameParts = gameObject.name.Split('_');
-        if (nameParts.Length == 2)
-        {
-            if (int.TryParse(nameParts[0], out int suitValue) && int.TryParse(nameParts[1], out int valueValue))
-            {
-                _card = new Card((Suit)suitValue, (Value)valueValue);
-            }
-        }
-        return _card;
     }
 
     private void ReturnCardToHand()

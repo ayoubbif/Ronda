@@ -59,7 +59,6 @@ public class Game : NetworkBehaviour
         }
     }
 
-
     private void Start()
     {
         _cardImage = cardPrefab.GetComponent<Image>();

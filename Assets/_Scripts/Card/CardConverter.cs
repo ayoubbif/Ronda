@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 [Serializable]
 public static class CardConverter
@@ -31,5 +32,20 @@ public static class CardConverter
         Value value = (Value)(codedCard % 100);
         return new Card(suit, value);
     }
+    public static Card GetCardValueFromGameObject(GameObject gameObject)
+    {
+        Card card = null;
 
+        // Extracting card suit and value from the GameObject's name
+        string[] nameParts = gameObject.name.Split('_');
+        if (nameParts.Length == 2)
+        {
+            if (int.TryParse(nameParts[0], out int suitValue) && int.TryParse(nameParts[1], out int valueValue))
+            {
+                card = new Card((Suit)suitValue, (Value)valueValue);
+            }
+        }
+
+        return card;
+    }
 }
