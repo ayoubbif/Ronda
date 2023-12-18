@@ -9,9 +9,6 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     private Transform _parent;
     private Table _table;
     private Card _card;
-
-    [SerializeField] private Value _value;
-    [SerializeField] private Suit _suit;
     
     private static Game Game => Game.Instance;
 
@@ -88,13 +85,8 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     private void PlayCardOnTable(Transform table)
     {
         SetCardParentAndPosition(table);
-
         _card = CardConverter.GetCardValueFromGameObject(gameObject);
-        _value = _card.Value;
-        _suit = _card.Suit;
-
         var localPlayerId = Game.LocalPlayer.OwnerClientId;
-
         Game.OnCardPlayedServerRpc(CardConverter.GetCodedCard(_card), localPlayerId);
     }
 

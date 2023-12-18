@@ -6,28 +6,21 @@ using UnityEngine;
 
 public class Player : NetworkBehaviour
 {
-    public Card[] Cards { get; set; }
-    
-    public string NickName => _nickName.Value.ToString();
+    // Network Variables
     private readonly NetworkVariable<FixedString32Bytes> _nickName = new();
-    
-    public uint Score
-    {
-        get => _score.Value;
-        set => _score.Value = value;
-    }
-
     private readonly NetworkVariable<uint> _score = new();
-
-    private static Game Game => Game.Instance;
     
-    public List<Card> CardsInHand
-    {
-        get => cardsInHand.ToList();
-        set => cardsInHand = value.ToList();
-    }
+    // Game instance
+    private static Game Game => Game.Instance; 
 
+    // SerializeField variable
     [SerializeField] private List<Card> cardsInHand;
+
+    // Public Properties
+    public Card[] Cards { get; set; }
+    public uint Score => _score.Value;
+    public List<Card> CardsInHand => cardsInHand.ToList();
+    
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -50,7 +43,6 @@ public class Player : NetworkBehaviour
 
     private static void ScoreChanged(uint oldValue, uint newValue)
     {
-        // Notify Game instance to update score UI
         Game.Instance.UpdateScoreUI();
     }
     

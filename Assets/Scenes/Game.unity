@@ -1302,8 +1302,8 @@ MonoBehaviour:
   playerHand: {fileID: 1727611296122602385}
   enemyHand: {fileID: 2110943522}
   players: []
-  _straightCards: []
-  _table: {fileID: 4559461925432081297}
+  straightCards: []
+  table: {fileID: 4559461925432081297}
   scoreText: {fileID: 2515157261046200120}
 --- !u!4 &1525513369
 Transform:

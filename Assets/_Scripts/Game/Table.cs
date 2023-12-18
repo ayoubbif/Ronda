@@ -1,17 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 public class Table : MonoBehaviour
 {
-    public List<Card> Cards
-    {
-        get => cards.ToList();
-        set => cards = value.ToList();
-    }
+    public List<Card> Cards => cards.ToList();
     [SerializeField] private List<Card> cards;
 
     public Table(List<Card> cards)

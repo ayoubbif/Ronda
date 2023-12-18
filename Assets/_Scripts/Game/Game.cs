@@ -5,33 +5,38 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 
 public class Game : NetworkBehaviour
 {
+    // Singleton Instance
     public static Game Instance { get; private set; }
-    
+
+    // SerializeField variables
     [SerializeField] private GameObject cardPrefab;
     [SerializeField] private Transform playerHand;
     [SerializeField] private Transform enemyHand;
+    [SerializeField] private List<Card> straightCards = new();
+    [SerializeField] private Table table;
+    [SerializeField] private TMP_Text scoreText;
+
+    // Player related variables
+    private const int MaxNumPlayers = 2;
     public List<Player> Players => players.ToList();
     [SerializeField] private List<Player> players = new();
-    private readonly int _maxNumPlayers = 2;
     
-    private Image _cardImage;
+    // Deck related variables
+    private Deck _deck;
+    private bool _isDeckInitialized;
+    private Card _scoredCard;
+    
+    // Game logic variables
     private int _numCardsToDeal;
     private Action<ulong> _onCardsDealt;
     private bool _isEmptyHanded;
     private bool _areMatchingCards;
-    
-    private Deck _deck;
-    private bool _isDeckInitialized;
-    private Card _scoredCard;
-    [SerializeField] private List<Card> _straightCards = new();
-
-    [SerializeField] private Table _table;
-    public TMP_Text scoreText;
      
     
     public Player LocalPlayer => GetLocalPlayer();
@@ -59,44 +64,12 @@ public class Game : NetworkBehaviour
             Destroy(gameObject);
         }
     }
-
-    private void Start()
-    {
-        _cardImage = cardPrefab.GetComponent<Image>();
-    }
-
-    public void AddPlayer(Player newPlayer)
-    {
-        players.Add(newPlayer);
-        
-        if(Players.Count == 2)
-            StartCoroutine(DealAfterDelay(1f));
-    }
-    
-    private Player GetLocalPlayer()
-    {
-        Player localPlayer = players.FirstOrDefault(x => x != null && x.IsLocalPlayer);
-
-        if (localPlayer == null)
-        {
-            Debug.LogError("Local player not found.");
-        }
-
-        return localPlayer;
-    }
-    
-    private IEnumerator DealAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-
-        S_Deal();
-    }
     
     #region Server
     
     private void S_Deal()
     {
-        if (IsServer == false && Players.Count < _maxNumPlayers)
+        if (IsServer == false && Players.Count < MaxNumPlayers)
         {
             Debug.Log("Not enough players");
             return;
@@ -181,7 +154,7 @@ public class Game : NetworkBehaviour
         }
         
         // Spawn the played card on the table for other players
-        GameObject playedCardObject = Instantiate(cardPrefab, _table.transform);
+        GameObject playedCardObject = Instantiate(cardPrefab, table.transform);
         Image playedCardImage = playedCardObject.GetComponent<Image>();
 
         // Load the sprite for the played card
@@ -214,7 +187,7 @@ public class Game : NetworkBehaviour
         
         // Create a list to store cards that need to be removed from the table
         var cardsToRemove = new HashSet<Card>();
-        var cardsOnTable = _table.Cards.ToHashSet();
+        var cardsOnTable = table.Cards.ToHashSet();
 
         // Iterate through cards on the table to find matching cards
         foreach (var cardOnTable in cardsOnTable.Where(cardOnTable => cardOnTable.Value == _scoredCard.Value))
@@ -232,7 +205,7 @@ public class Game : NetworkBehaviour
         
         foreach (var cardToRemove in cardsToRemove)
         {
-            _table.RemoveCardFromTable(cardToRemove.Suit, cardToRemove.Value);
+            table.RemoveCardFromTable(cardToRemove.Suit, cardToRemove.Value);
         }
         
         // Invoke the RPC to set corresponding GameObjects inactive on clients
@@ -255,7 +228,7 @@ public class Game : NetworkBehaviour
     [ClientRpc]
     private void AddCardToTableClientRpc(Card card)
     {
-        _table.AddCardToTable(card);
+        table.AddCardToTable(card);
     }
     
     [ClientRpc]
@@ -307,7 +280,7 @@ public class Game : NetworkBehaviour
                 player.AddScore(matchedScoreToAdd);
                 
                 Debug.Log($"Player {playerId} scored {matchedScoreToAdd} points. Total score: {player.Score}");
-                NotifyServerToRemoveMatchingCardsClientRpc(playedCard, _straightCards.ToArray());
+                NotifyServerToRemoveMatchingCardsClientRpc(playedCard, straightCards.ToArray());
             }
         }
         else
@@ -318,6 +291,24 @@ public class Game : NetworkBehaviour
     
     #endregion
     
+    public void AddPlayer(Player newPlayer)
+    {
+        players.Add(newPlayer);
+        
+        if(Players.Count == 2)
+            StartCoroutine(DealAfterDelay(1f));
+    }
+    private Player GetLocalPlayer()
+    {
+        Player localPlayer = players.FirstOrDefault(x => x != null && x.IsLocalPlayer);
+
+        if (localPlayer == null)
+        {
+            Debug.LogError("Local player not found.");
+        }
+
+        return localPlayer;
+    }
     private void InitDeck(int[] deck)
     {
         _deck = new Deck(deck);
@@ -345,49 +336,18 @@ public class Game : NetworkBehaviour
             SetPlayersCardsClientRpc(player.OwnerClientId, player.Cards);
         }
     }
+    private IEnumerator DealAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        S_Deal();
+    }
     private void CheckForEmptyHandAndDeal()
     {
         // Check if there are exactly 2 players and both players have empty hands
         if (Players.Count != 2 || !_isEmptyHanded) return;
         
-        Debug.Log(LocalPlayer.CardsInHand.Count);
         StartCoroutine(DealAfterDelay(2f));
-    }
-    private void UpdateCardImages()
-    {
-        for (int i = 0; i < LocalPlayer.Cards.Length; i++)
-        {
-            var cardInstance = Instantiate(cardPrefab, playerHand);
-            UpdateCardImage(LocalPlayer.Cards[i], cardInstance);
-        }
-    }
-    private void UpdateCardImage(Card card, GameObject cardInstance)
-    {
-        var cardImage = cardInstance.GetComponent<Image>();
-                
-        Suit cardSuit = card.Suit;
-        Value cardValue = card.Value;
-
-        string spritePath = GetSpriteFilePath(cardSuit, cardValue);
-        Sprite sprite = LoadSprite(spritePath);
-
-        cardImage.sprite = sprite;
-        cardInstance.name = $"{(int)cardSuit}_{(int)cardValue}";
-    }
-    private string GetSpriteFilePath(Suit cardSuit, Value cardValue)
-    {
-        return $"Sprites/Cards/{(int)cardSuit}_{(int)cardValue}";
-    }
-    private Sprite LoadSprite(string spritePath)
-    {
-        Sprite sprite = Resources.Load<Sprite>(spritePath);
-
-        if (sprite == null)
-        {
-            Debug.LogError($"Sprite not found at path: {spritePath}");
-        }
-
-        return sprite;
     }
     private void InitLocalPlayerCards()
     {
@@ -398,7 +358,7 @@ public class Game : NetworkBehaviour
         }
 
         // Update the card images based on the player's hand
-        UpdateCardImages();
+        SpriteConverter.UpdatePlayerCardImages(LocalPlayer.Cards, cardPrefab, playerHand);
     }
     private void InitEnemyPlayerCards()
     {
@@ -408,27 +368,8 @@ public class Game : NetworkBehaviour
             return;
         }
         // Update the card images based on the player's hand
-        UpdateEnemyCardImages();
+        SpriteConverter.UpdateEnemyCardImages(LocalPlayer.Cards, cardPrefab, enemyHand);
     }
-       
-    private void UpdateEnemyCardImages()
-    {
-        for (int i = 0; i < LocalPlayer.Cards.Length; i++)
-        {
-            var cardInstance = Instantiate(cardPrefab, enemyHand);
-            UpdateEnemyCardImage(cardInstance);
-        }
-    }
-    
-    private void UpdateEnemyCardImage(GameObject cardInstance)
-    {
-        var cardImage = cardInstance.GetComponent<Image>();
-        string spritePath = "Sprites/Cards/Back";
-        Sprite sprite = LoadSprite(spritePath);
-        cardImage.sprite = sprite;
-        cardInstance.name = $"Enemy_Card_{cardInstance.GetInstanceID()}";
-    }
-    
     private void SetPlayersCards(ulong playerId, Card[] cards)
     {
         Player player = players.FirstOrDefault(x => x != null && x.OwnerClientId == playerId);
@@ -444,24 +385,13 @@ public class Game : NetworkBehaviour
     private bool IsMatchingCardOnTable(Value playedCardValue)
     {
         // Iterate through the cards on the table and check if any of them have the same value
-        return _table.Cards.Any(cardOnTable => cardOnTable.Value == playedCardValue);
-    }
-    public void UpdateScoreUI()
-    {
-        scoreText.text = LocalPlayer.Score.ToString();
-    }
-    private GameObject FindCardObjectOnTable(Card card)
-    {
-        // Iterate through the children of the table to find the card GameObject
-        return (from Transform child in _table.transform
-            where child.name == $"{(int)card.Suit}_{(int)card.Value}"
-            select child.gameObject).FirstOrDefault();
+        return table.Cards.Any(cardOnTable => cardOnTable.Value == playedCardValue);
     }
     private int CheckSequenceScore(Value playedCardValue)
     {
-        _straightCards = new List<Card>();
+        straightCards = new List<Card>();
 
-        var sortedCards = _table.Cards.OrderBy(x => x.Value).ToList();
+        var sortedCards = table.Cards.OrderBy(x => x.Value).ToList();
 
         for (int i = 0; i < sortedCards.Count; i++)
         {
@@ -473,10 +403,21 @@ public class Game : NetworkBehaviour
             while (j < sortedCards.Count - 1 && sortedCards[j + 1].Value == sortedCards[j].Value + 1)
             {
                 j++;
-                _straightCards.Add(sortedCards[j]);
+                straightCards.Add(sortedCards[j]);
             }
         }
         
-        return _straightCards.Count; 
+        return straightCards.Count; 
+    }
+    private GameObject FindCardObjectOnTable(Card card)
+    {
+        // Iterate through the children of the table to find the card GameObject
+        return (from Transform child in table.transform
+            where child.name == $"{(int)card.Suit}_{(int)card.Value}"
+            select child.gameObject).FirstOrDefault();
+    }
+    public void UpdateScoreUI()
+    {
+        scoreText.text = LocalPlayer.Score.ToString();
     }
 }
