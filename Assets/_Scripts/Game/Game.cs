@@ -16,6 +16,7 @@ public class Game : NetworkBehaviour
 
     // SerializeField variables
     [SerializeField] private GameObject cardPrefab;
+    [SerializeField] private GameObject enemyCardPrefab;
     [SerializeField] private Transform playerHand;
     [SerializeField] private Transform enemyHand;
     [SerializeField] private List<Card> straightCards = new();
@@ -156,6 +157,12 @@ public class Game : NetworkBehaviour
         // Spawn the played card on the table for other players
         GameObject playedCardObject = Instantiate(cardPrefab, table.transform);
         Image playedCardImage = playedCardObject.GetComponent<Image>();
+        
+        
+        var cardController = playedCardObject.gameObject.GetComponent<CardController>();
+        cardController.animationSpeedConfig.position = 0;
+        cardController.animationSpeedConfig.rotation = 0;
+        cardController.animationSpeedConfig.releasePosition = 0;
 
         // Load the sprite for the played card
         string path = $"Sprites/Cards/{(int)playedCard.Suit}_{(int)playedCard.Value}";
@@ -368,7 +375,7 @@ public class Game : NetworkBehaviour
             return;
         }
         // Update the card images based on the player's hand
-        SpriteConverter.UpdateEnemyCardImages(LocalPlayer.Cards, cardPrefab, enemyHand);
+        SpriteConverter.UpdateEnemyCardImages(LocalPlayer.Cards, enemyCardPrefab, enemyHand);
     }
     private void SetPlayersCards(ulong playerId, Card[] cards)
     {

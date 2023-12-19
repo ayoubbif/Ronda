@@ -11,9 +11,8 @@ GameObject:
   - component: {fileID: 1433448434328679684}
   - component: {fileID: 1711553340123011668}
   - component: {fileID: 7094862360355255014}
-  - component: {fileID: 7877931131116062619}
   m_Layer: 5
-  m_Name: Card
+  m_Name: EnemyCard
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -76,19 +75,3 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &7877931131116062619
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000016203661699412}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b36ad1761eda4cca8fe152edfd3048f0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  targetRotation: 0
-  targetPosition: {x: 0, y: 0}
-  targetVerticalDisplacement: 0
-  container: {fileID: 0}
