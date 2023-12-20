@@ -5,7 +5,6 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using Unity.Netcode;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 
@@ -22,11 +21,7 @@ public class Game : NetworkBehaviour
     [SerializeField] private List<Card> straightCards = new();
     [SerializeField] private Table table;
     [SerializeField] private TMP_Text scoreText;
-
-    // Player related variables
-    private const int MaxNumPlayers = 2;
-    public List<Player> Players => players.ToList();
-    [SerializeField] private List<Player> players = new();
+    
     
     // Deck related variables
     private Deck _deck;
@@ -36,22 +31,24 @@ public class Game : NetworkBehaviour
     // Game logic variables
     private int _numCardsToDeal;
     private Action<ulong> _onCardsDealt;
+    public Action OnPlayersSpawned;
     private bool _isEmptyHanded;
     private bool _areMatchingCards;
-     
     
-    public Player LocalPlayer => GetLocalPlayer();
+    private static PlayerManager PlayerManager => PlayerManager.Instance;
 
     private void OnEnable()
     {
         _onCardsDealt += SpawnCardsClientRpc;
         _onCardsDealt += SpawnEnemyClientRpc;
+        OnPlayersSpawned += OnPlayersSpawn;
     }
     
     private void OnDisable()
     {
         _onCardsDealt -= SpawnCardsClientRpc;
         _onCardsDealt -= SpawnEnemyClientRpc;
+        OnPlayersSpawned -= OnPlayersSpawn;
     }
 
     private void Awake()
@@ -67,10 +64,9 @@ public class Game : NetworkBehaviour
     }
     
     #region Server
-    
     private void S_Deal()
     {
-        if (IsServer == false && Players.Count < MaxNumPlayers)
+        if (IsServer == false && PlayerManager.Players.Count < PlayerManager.MaxNumPlayers)
         {
             Debug.Log("Not enough players");
             return;
@@ -103,36 +99,33 @@ public class Game : NetworkBehaviour
         // Initialize the deck on the client
         InitDeck(deck);
     }
-
     [ClientRpc]
     private void SetPlayersCardsClientRpc(ulong playerId, Card[] cards)
     {
         SetPlayersCards(playerId, cards);
         
-        if (LocalPlayer.OwnerClientId == playerId)
+        if (PlayerManager.LocalPlayer.OwnerClientId == playerId)
         {
-            LocalPlayer.AddCardsToHand(cards.ToList());
+            PlayerManager.LocalPlayer.AddCardsToHand(cards.ToList());
 
             _isEmptyHanded = false;
         }
     }
-
     [ClientRpc]
     private void SpawnCardsClientRpc(ulong playerId)
     {
         // Check if the current instance is the local player's client
-        if (IsClient && LocalPlayer.OwnerClientId == playerId)
+        if (IsClient && PlayerManager.LocalPlayer.OwnerClientId == playerId)
         {
             InitLocalPlayerCards();
         
         }
     }
-        
     [ClientRpc]
     private void SpawnEnemyClientRpc(ulong playerId)
     {
         // Check if the current instance is the local player's client
-        if (IsClient && LocalPlayer.OwnerClientId == playerId)
+        if (IsClient && PlayerManager.LocalPlayer.OwnerClientId == playerId)
         {
             InitEnemyPlayerCards();
         }
@@ -144,12 +137,12 @@ public class Game : NetworkBehaviour
         Card playedCard = CardConverter.DecodeCodedCard(codedCard);
         
         // Remove the played card from the player's hand
-        LocalPlayer.RemoveCardFromHand(playedCard.Value, playedCard.Suit);
+        PlayerManager.LocalPlayer.RemoveCardFromHand(playedCard.Value, playedCard.Suit);
         
         CheckMatchingCardsOnTableClientRpc(playedCard);
 
         // Check if the player invoking the method is the local player
-        if (LocalPlayer.OwnerClientId == playerId)
+        if (PlayerManager.LocalPlayer.OwnerClientId == playerId)
         {
             return;
         }
@@ -158,11 +151,7 @@ public class Game : NetworkBehaviour
         GameObject playedCardObject = Instantiate(cardPrefab, table.transform);
         Image playedCardImage = playedCardObject.GetComponent<Image>();
         
-        
-        var cardController = playedCardObject.gameObject.GetComponent<CardController>();
-        cardController.animationSpeedConfig.position = 0;
-        cardController.animationSpeedConfig.rotation = 0;
-        cardController.animationSpeedConfig.releasePosition = 0;
+        SetupAnimationConfigToZero(playedCardObject);
 
         // Load the sprite for the played card
         string path = $"Sprites/Cards/{(int)playedCard.Suit}_{(int)playedCard.Value}";
@@ -174,13 +163,13 @@ public class Game : NetworkBehaviour
         }
         else
         {
+            playedCardImage.raycastTarget = false;
             playedCardImage.sprite = sprite;
             playedCardObject.name = $"{(int)playedCard.Suit}_{(int)playedCard.Value}";
         }
         
-        _isEmptyHanded = players.All(player => player.CardsInHand.Count == 0);
+        _isEmptyHanded = PlayerManager.Players.All(player => player.CardsInHand.Count == 0);
     }
-
     [ClientRpc]
     private void CheckMatchingCardsOnTableClientRpc(Card card)
     {
@@ -237,9 +226,8 @@ public class Game : NetworkBehaviour
     {
         table.AddCardToTable(card);
     }
-    
     [ClientRpc]
-    public void RemoveCardFromEnemyHandClientRpc(ulong playerId)
+    private void RemoveCardFromEnemyHandClientRpc(ulong playerId)
     {
         if(NetworkManager.Singleton.LocalClientId != playerId) 
         {
@@ -257,7 +245,7 @@ public class Game : NetworkBehaviour
     public void OnCardPlayedServerRpc(int codedCard, ulong playerId)
     {
         // Find the player who played the card
-        var player = Players.FirstOrDefault(p => p.OwnerClientId == playerId);
+        var player = PlayerManager.Players.FirstOrDefault(p => p.OwnerClientId == playerId);
         
         // Decode the coded card to get the suit and value
         Card playedCard = CardConverter.DecodeCodedCard(codedCard);
@@ -298,24 +286,12 @@ public class Game : NetworkBehaviour
     
     #endregion
     
-    public void AddPlayer(Player newPlayer)
+    private void OnPlayersSpawn()
     {
-        players.Add(newPlayer);
-        
-        if(Players.Count == 2)
+        if(PlayerManager.Players.Count == 2)
             StartCoroutine(DealAfterDelay(1f));
     }
-    private Player GetLocalPlayer()
-    {
-        Player localPlayer = players.FirstOrDefault(x => x != null && x.IsLocalPlayer);
-
-        if (localPlayer == null)
-        {
-            Debug.LogError("Local player not found.");
-        }
-
-        return localPlayer;
-    }
+    
     private void InitDeck(int[] deck)
     {
         _deck = new Deck(deck);
@@ -327,7 +303,7 @@ public class Game : NetworkBehaviour
     {
         _numCardsToDeal = _deck.Cards.Count == 4 ? 2 : 3;
 
-        foreach (var player in players)
+        foreach (var player in PlayerManager.Players)
         {
             // Ensure that the player.Cards array is initialized with the correct size
             player.InitializeCards(_numCardsToDeal);
@@ -352,34 +328,34 @@ public class Game : NetworkBehaviour
     private void CheckForEmptyHandAndDeal()
     {
         // Check if there are exactly 2 players and both players have empty hands
-        if (Players.Count != 2 || !_isEmptyHanded) return;
+        if (PlayerManager.Players.Count != 2 || !_isEmptyHanded) return;
         
         StartCoroutine(DealAfterDelay(2f));
     }
     private void InitLocalPlayerCards()
     {
-        if (LocalPlayer.Cards == null)
+        if (PlayerManager.LocalPlayer.Cards == null)
         {
-            LocalPlayer.InitializeCards(_numCardsToDeal);
+            PlayerManager.LocalPlayer.InitializeCards(_numCardsToDeal);
             return;
         }
 
         // Update the card images based on the player's hand
-        SpriteConverter.UpdatePlayerCardImages(LocalPlayer.Cards, cardPrefab, playerHand);
+        SpriteConverter.UpdatePlayerCardImages(PlayerManager.LocalPlayer.Cards, cardPrefab, playerHand);
     }
     private void InitEnemyPlayerCards()
     {
-        if (LocalPlayer.Cards == null)
+        if (PlayerManager.LocalPlayer.Cards == null)
         {
-            LocalPlayer.InitializeCards(_numCardsToDeal);
+            PlayerManager.LocalPlayer.InitializeCards(_numCardsToDeal);
             return;
         }
         // Update the card images based on the player's hand
-        SpriteConverter.UpdateEnemyCardImages(LocalPlayer.Cards, enemyCardPrefab, enemyHand);
+        SpriteConverter.UpdateEnemyCardImages(PlayerManager.LocalPlayer.Cards, enemyCardPrefab, enemyHand);
     }
     private void SetPlayersCards(ulong playerId, Card[] cards)
     {
-        Player player = players.FirstOrDefault(x => x != null && x.OwnerClientId == playerId);
+        Player player = PlayerManager.Players.FirstOrDefault(x => x != null && x.OwnerClientId == playerId);
 
         if (player == null)
         {
@@ -388,6 +364,14 @@ public class Game : NetworkBehaviour
         
         player.SetCards(cards);
         _onCardsDealt?.Invoke(player.OwnerClientId);
+    }
+    private static void SetupAnimationConfigToZero(GameObject playedCardObject)
+    {
+        var cardController = playedCardObject.gameObject.GetComponent<CardController>();
+        
+        cardController.animationSpeedConfig.position = 0;
+        cardController.animationSpeedConfig.rotation = 0;
+        cardController.animationSpeedConfig.releasePosition = 0;
     }
     private bool IsMatchingCardOnTable(Value playedCardValue)
     {
@@ -425,6 +409,6 @@ public class Game : NetworkBehaviour
     }
     public void UpdateScoreUI()
     {
-        scoreText.text = LocalPlayer.Score.ToString();
+        scoreText.text = PlayerManager.LocalPlayer.Score.ToString();
     }
 }

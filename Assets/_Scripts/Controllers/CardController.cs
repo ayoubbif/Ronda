@@ -11,6 +11,7 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     private Card _card;
     
     private static Game Game => Game.Instance;
+    private static PlayerManager PlayerManager => PlayerManager.Instance;
 
     public float targetRotation;
     public Vector2 targetPosition;
@@ -164,6 +165,7 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
         {
             PlayCardOnTable(eventData.pointerEnter.transform);
             _releasedOnTable = true;
+            _cardImage.raycastTarget = false;
         }
         else
         {
@@ -180,7 +182,7 @@ public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHand
     {
         SetCardParentAndPosition(table);
         _card = CardConverter.GetCardValueFromGameObject(gameObject);
-        var localPlayerId = Game.LocalPlayer.OwnerClientId;
+        var localPlayerId = PlayerManager.LocalPlayer.OwnerClientId;
         Game.OnCardPlayedServerRpc(CardConverter.GetCodedCard(_card), localPlayerId);
     }
 

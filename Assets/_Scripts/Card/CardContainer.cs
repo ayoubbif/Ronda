@@ -1,5 +1,3 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -68,7 +66,7 @@ public class CardContainer : MonoBehaviour
 
     private float GetCardVerticalDisplacement(int index)
     {
-        if (_cards.Count < 3) return 0;
+        if (_cards.Count < 2) return 0;
 
         return maxHeightDisplacement *
                (1 - Mathf.Pow(index - (_cards.Count - 1) / 2f, 2) / Mathf.Pow((_cards.Count - 1) / 2f, 2));
@@ -76,7 +74,7 @@ public class CardContainer : MonoBehaviour
 
     private float GetCardRotation(int index)
     {
-        if (_cards.Count < 3) return 0;
+        if (_cards.Count < 2) return 0;
 
         return -rotationAngle * (index - (_cards.Count - 1) / 2f) / ((_cards.Count - 1) / 2f);
     }

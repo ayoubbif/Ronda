@@ -11,7 +11,8 @@ public class Player : NetworkBehaviour
     private readonly NetworkVariable<uint> _score = new();
     
     // Game instance
-    private static Game Game => Game.Instance; 
+    private static Game Game => Game.Instance;
+    private static PlayerManager PlayerManager => PlayerManager.Instance;
 
     // SerializeField variable
     [SerializeField] private List<Card> cardsInHand;
@@ -43,7 +44,7 @@ public class Player : NetworkBehaviour
 
     private static void ScoreChanged(uint oldValue, uint newValue)
     {
-        Game.Instance.UpdateScoreUI();
+        Game.UpdateScoreUI();
     }
     
     public void InitializeCards(int size)
@@ -79,8 +80,8 @@ public class Player : NetworkBehaviour
     [ClientRpc]
     private void AddPlayerClientRpc()
     {
-        Game.AddPlayer(this);
-        Debug.Log($"Player count: {Game.Players.Count}");
+        PlayerManager.AddPlayer(this);
+        Debug.Log($"Player count: {PlayerManager.Players.Count}");
     }
 
     [ServerRpc]
